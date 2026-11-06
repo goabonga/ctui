@@ -282,6 +282,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   deterministic layout function (`ctui_treemap_squarify()`) that ignores zero,
   negative, NaN and infinite weights and tiles the area exactly, plus cell
   lookup for the mouse.
+- **calendar**: month grid with a cursor day, marked and selected days, week
+  and day views with events, repeat rules and events lasting several days.
 
 ## Tests
 
