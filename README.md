@@ -70,6 +70,10 @@ are ignored, and `ctui_labels_load()` reads a single file.
   right-aligned hints and a pure layout shared with mouse hit testing.
 - **statusbar**: powerline status bar with left and right runs of toned
   segments and automatic hard or soft dividers.
+- **spinner**: activity indicator in three frame sets (braille, line, dots)
+  with an ASCII fallback and an optional label; the frame is a pure function
+  of the time the caller passes in (`ctui_spinner_index()`), at 10 frames a second
+  unless `fps` says otherwise.
 
 ## Tests
 
