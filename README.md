@@ -179,6 +179,9 @@ are ignored, and `ctui_labels_load()` reads a single file.
   mouse toggling and painting with the wheel for velocity; pure helpers
   (`ctui_stepseq_bit_*`, `ctui_stepseq_wrap()`) let a sequencer engine work on the
   same data.
+- **textview**: read-only text view with line-number gutter, cursor,
+  selection, tab stops, wide characters and scrolling, sideways too with an
+  optional horizontal scrollbar under the text (the gutter stays fixed).
 
 ## Tests
 
