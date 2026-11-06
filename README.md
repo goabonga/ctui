@@ -82,6 +82,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   with green, yellow and red zones, a peak-hold marker that falls with a
   time step given by the caller, a clip indicator, stereo pair placement and
   dB / linear conversions; the level is set with keys, the mouse or the wheel.
+- **dialog**: non-blocking confirm, prompt and text viewer dialogs driven by
+  plain state structs, and a helper centring a dialog of any size.
 
 ## Tests
 
