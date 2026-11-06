@@ -21,6 +21,7 @@
 #include <ctui/form.h>
 #include <ctui/frame.h>
 #include <ctui/gauge.h>
+#include <ctui/geo.h>
 #include <ctui/heatmap.h>
 #include <ctui/helpview.h>
 #include <ctui/hexview.h>
