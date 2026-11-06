@@ -11,6 +11,7 @@ CFLAGS  += -std=c11 -Wall -Wextra -Wpedantic -Werror -D_POSIX_C_SOURCE=200809L \
 PREFIX  ?= /usr/local
 LIBDIR  ?= $(PREFIX)/lib
 INSTALL ?= install
+SOVERSION := 0
 # The version is the CTUI_VERSION of the umbrella header, which multicz bumps.
 VERSION := $(shell sed -n 's/^\#define CTUI_VERSION "\(.*\)"/\1/p' include/ctui/ctui.h)
 SANITIZE ?= address,undefined
@@ -20,6 +21,8 @@ SRCS    := $(sort $(wildcard src/*.c))
 OBJS    := $(SRCS:src/%.c=$(BUILD)/%.o)
 HEADERS := $(sort $(wildcard include/ctui/*.h))
 LIB     := $(BUILD)/libctui.a
+PIC_OBJS := $(SRCS:src/%.c=$(BUILD)/pic/%.o)
+SHLIB   := $(BUILD)/libctui.so.$(VERSION)
 SOURCES := $(SRCS) $(HEADERS) $(wildcard tests/*.c)
 
 # Unit tests are linked with the library built with the sanitizers.
@@ -33,7 +36,7 @@ SAN_LIB   := $(BUILD)/libctui-san.a
 TEST_SRCS := $(sort $(wildcard tests/test_*.c))
 TEST_BINS := $(TEST_SRCS:tests/%.c=$(BUILD)/tests/%)
 
-.PHONY: all test check-headers check-install format format-check lint clean install uninstall
+.PHONY: all test check-headers check-install check-shared format format-check lint clean install uninstall shared install-shared
 
 all: $(LIB)
 
@@ -45,9 +48,9 @@ $(BUILD)/%.o: src/%.c $(HEADERS) | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD):
-	mkdir -p $@ $(BUILD)/san $(BUILD)/tests $(BUILD)/hdr
+	mkdir -p $@ $(BUILD)/san $(BUILD)/tests $(BUILD)/hdr $(BUILD)/pic $(BUILD)/shared
 
-test: check-headers check-install $(TEST_BINS)
+test: check-headers check-install check-shared $(TEST_BINS)
 	@set -e; for t in $(TEST_BINS); do echo "== $$t"; $$t; done
 
 $(BUILD)/san/%.o: src/%.c $(HEADERS) | $(BUILD)
@@ -79,6 +82,34 @@ check-install: $(LIB)
 	  $$($(PKG_CONFIG) --cflags ctui) -o $(BUILD)/consumer tests/consumer.c \
 	  $$($(PKG_CONFIG) --libs ctui) && $(BUILD)/consumer && echo "install ok"
 
+# Shared library: separate -fPIC objects, only the ctui_ API is exported.
+shared: $(SHLIB)
+
+$(BUILD)/pic/%.o: src/%.c $(HEADERS) | $(BUILD)
+	$(CC) $(CFLAGS) -fPIC -c -o $@ $<
+
+$(SHLIB): $(PIC_OBJS) libctui.map
+	$(CC) $(CFLAGS) $(LDFLAGS) -shared -Wl,-soname,libctui.so.$(SOVERSION) \
+	  -Wl,--version-script=libctui.map -o $@ $(PIC_OBJS) $(NCURSES_LIBS) -lm
+
+install-shared: install $(SHLIB)
+	$(INSTALL) -m 755 $(SHLIB) $(DESTDIR)$(LIBDIR)/libctui.so.$(VERSION)
+	ln -sf libctui.so.$(VERSION) $(DESTDIR)$(LIBDIR)/libctui.so.$(SOVERSION)
+	ln -sf libctui.so.$(SOVERSION) $(DESTDIR)$(LIBDIR)/libctui.so
+
+# Link tests/consumer.c against the shared library; check the SONAME and that
+# nothing but ctui_ symbols is exported.
+check-shared: $(SHLIB) | $(BUILD)
+	@ln -sf ../libctui.so.$(VERSION) $(BUILD)/shared/libctui.so
+	@ln -sf ../libctui.so.$(VERSION) $(BUILD)/shared/libctui.so.$(SOVERSION)
+	@$(CC) -std=c11 -Wall -Wextra -Wpedantic -Werror $(LDFLAGS) -Iinclude $(NCURSES_CFLAGS) \
+	  -o $(BUILD)/consumer-shared tests/consumer.c -L$(BUILD)/shared -lctui \
+	  $(NCURSES_LIBS) -lm -Wl,-rpath,$(abspath $(BUILD))/shared
+	@$(BUILD)/consumer-shared >/dev/null
+	@readelf -d $(SHLIB) | grep -q 'SONAME.*\[libctui.so.$(SOVERSION)\]'
+	@! nm -D --defined-only $(SHLIB) | grep -v ' ctui_' | grep -q .
+	@echo "shared ok"
+
 format:
 	clang-format -i $(SOURCES)
 
@@ -98,6 +129,8 @@ install: $(LIB)
 	  -e 's|@VERSION@|$(VERSION)|' ctui.pc.in > $(DESTDIR)$(LIBDIR)/pkgconfig/ctui.pc
 
 uninstall:
+	rm -f $(DESTDIR)$(LIBDIR)/libctui.so $(DESTDIR)$(LIBDIR)/libctui.so.$(SOVERSION) \
+	  $(DESTDIR)$(LIBDIR)/libctui.so.$(VERSION)
 	rm -f $(DESTDIR)$(LIBDIR)/libctui.a $(DESTDIR)$(LIBDIR)/pkgconfig/ctui.pc
 	rm -rf $(DESTDIR)$(PREFIX)/include/ctui
 
