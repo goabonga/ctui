@@ -7,6 +7,7 @@
 #include <ctui/frame.h>
 #include <ctui/gauge.h>
 #include <ctui/labels.h>
+#include <ctui/scrollbar.h>
 #include <ctui/text.h>
 #include <ctui/theme.h>
 
