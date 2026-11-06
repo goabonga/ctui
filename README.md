@@ -64,6 +64,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   by value.
 - **frame**: rounded frames with an optional close button, separators and summary cards with labelled
   gauges that adapt to their height.
+- **scrollbar**: vertical or horizontal scrollbar with a proportional thumb,
+  grabbing and dragging, page jumps on the track and mouse wheel support.
 
 ## Tests
 
