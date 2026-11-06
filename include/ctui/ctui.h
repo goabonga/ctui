@@ -10,6 +10,7 @@
 #include <ctui/calendar.h>
 #include <ctui/calendar_color.h>
 #include <ctui/calendar_dialog.h>
+#include <ctui/calendar_event.h>
 #include <ctui/calendar_month.h>
 #include <ctui/calendar_select.h>
 #include <ctui/calendar_view.h>
