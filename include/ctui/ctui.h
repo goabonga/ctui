@@ -18,6 +18,7 @@
 #include <ctui/labels.h>
 #include <ctui/layout.h>
 #include <ctui/list.h>
+#include <ctui/logview.h>
 #include <ctui/meter.h>
 #include <ctui/numinput.h>
 #include <ctui/pads.h>
