@@ -157,6 +157,9 @@ are ignored, and `ctui_labels_load()` reads a single file.
   scrolling and mouse support; drawn on the page or inside a dialog.
 - **picker**: centred file, folder and file-or-folder chooser dialogs browsing one folder at a
   time, with hidden-file toggle, sizes, icons and mouse support.
+- **slider**: standalone horizontal or vertical fader with a filled track, knob,
+  label and value, an optional centre mark for bipolar values, keys, and mouse
+  press, drag and wheel mapped to the value by pure functions.
 
 ## Tests
 
