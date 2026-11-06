@@ -24,6 +24,8 @@ make test
 
 The unit tests run with AddressSanitizer and UndefinedBehaviorSanitizer;
 pass `SANITIZE=` to disable them on platforms that reject them.
+`make test` first checks that every public header compiles on its own
+(`make check-headers`).
 
 ## Code quality
 
