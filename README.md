@@ -317,6 +317,14 @@ are ignored, and `ctui_labels_load()` reads a single file.
   and parts; corrupt or truncated tiles are refused, never read past the end.
 - **tilecache**: bounded LRU cache of decoded tiles, limited in number and in
   bytes.
+- **map**: world map of Braille dots on a canvas. The whole world is drawn
+  offline from an embedded Natural Earth coastline, with a zoom cap; with
+  `online` set and a tile callback (raw, decompressed MVT bytes for a z / x /
+  y, or "not available") the cap is lifted and vector tiles are drawn in
+  categories with their own colours and visibility, over-zoomed beyond the
+  source's maximum zoom, with segments hugging the tile edges skipped. Keys,
+  drag and wheel pan and zoom; `ctui_map_hit()` and `ctui_map_categorize()` are
+  pure. The library has no network, SQLite or zlib dependency.
 
 ## Tests
 
