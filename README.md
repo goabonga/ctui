@@ -189,6 +189,20 @@ are ignored, and `ctui_labels_load()` reads a single file.
   a modified flag, an optional size limit, a read-only mode, an optional
   line-number gutter, and mouse click and drag; the editing operations work
   on byte offsets without a screen.
+- **richtext**: styled text made of spans (a UTF-8 slice with a theme colour,
+  bold / dim / italic / underline / reverse and a link id), lines of spans and
+  documents of lines, all in caller-owned arrays. `ctui_rt_parse()` reads a small
+  markup (`[b]` `[d]` `[i]` `[u]` `[r]`, `[fg=ok]`, `[link=3]`, `[/]` or `[/b]`
+  to close, `\[` for a literal bracket); an unknown, unbalanced or too deeply
+  nested tag stays literal text and parsing never fails on its input. Rows wrap
+  at spaces across spans, keep their styles and the column widths of wide and
+  combining characters, and are aligned left, centre, right or justified;
+  rows can be cut with the ellipsis, scrolled with a row offset and drawn
+  clipped to a rectangle (`ctui_rt_draw()`). `ctui_rt_height()` measures the
+  wrapped height for a width and `ctui_rt_hit()` / `ctui_rt_link_at()` tell which
+  span is under a cell. The demo's Rich page cycles the alignment with `a`,
+  toggles wrapping with `w` and the ellipsis with `e`, scrolls with the arrows,
+  Page keys and wheel, and reports clicks on its links.
 
 ## Tests
 
