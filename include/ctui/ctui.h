@@ -56,6 +56,7 @@
 #include <ctui/tabbar.h>
 #include <ctui/table.h>
 #include <ctui/tabpanel.h>
+#include <ctui/terminal.h>
 #include <ctui/text.h>
 #include <ctui/textarea.h>
 #include <ctui/textview.h>
