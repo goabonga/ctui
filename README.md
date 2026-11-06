@@ -78,6 +78,10 @@ are ignored, and `ctui_labels_load()` reads a single file.
   rising in eighths of a row on several.
 - **panel**: scrollable panel of titled sections of readings with optional
   gauges and notes, flowing into two columns on wide screens.
+- **meter**: vertical or horizontal audio level meter on a -60..0 dBFS scale
+  with green, yellow and red zones, a peak-hold marker that falls with a
+  time step given by the caller, a clip indicator, stereo pair placement and
+  dB / linear conversions; the level is set with keys, the mouse or the wheel.
 
 ## Tests
 
