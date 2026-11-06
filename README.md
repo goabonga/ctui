@@ -95,6 +95,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   left; Right/Enter open and Left/Esc close, and clicks and hover follow.
 - **tree**: lazily loaded file tree with sorting, keyboard navigation and
   file-type icons (Nerd Font glyphs with an ASCII fallback).
+- **tabpanel**: tab strip for panels inside a page or a dialog, with keyboard
+  selection, a marked rule and mouse hit testing.
 
 ## Tests
 
