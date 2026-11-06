@@ -66,6 +66,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   gauges that adapt to their height.
 - **scrollbar**: vertical or horizontal scrollbar with a proportional thumb,
   grabbing and dragging, page jumps on the track and mouse wheel support.
+- **tabbar**: powerline tab bar with icons, disabled and closable tabs,
+  right-aligned hints and a pure layout shared with mouse hit testing.
 
 ## Tests
 
