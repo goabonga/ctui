@@ -13,7 +13,16 @@ OBJS    := $(SRCS:src/%.c=$(BUILD)/%.o)
 HEADERS := $(sort $(wildcard include/ctui/*.h))
 LIB     := $(BUILD)/libctui.a
 
-.PHONY: all clean install
+# Unit tests are linked with the library built with the sanitizers.
+# -fno-pie -no-pie: on linux-hardened a PIE lands inside the ASan shadow
+# range.
+SAN_FLAGS := -g -fno-pie -fsanitize=address,undefined -fno-sanitize-recover=all
+SAN_OBJS  := $(SRCS:src/%.c=$(BUILD)/san/%.o)
+SAN_LIB   := $(BUILD)/libctui-san.a
+TEST_SRCS := $(sort $(wildcard tests/test_*.c))
+TEST_BINS := $(TEST_SRCS:tests/%.c=$(BUILD)/tests/%)
+
+.PHONY: all test clean install
 
 all: $(LIB)
 
@@ -25,7 +34,20 @@ $(BUILD)/%.o: src/%.c $(HEADERS) | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD):
-	mkdir -p $@
+	mkdir -p $@ $(BUILD)/san $(BUILD)/tests
+
+test: $(TEST_BINS)
+	@set -e; for t in $(TEST_BINS); do echo "== $$t"; $$t; done
+
+$(BUILD)/san/%.o: src/%.c $(HEADERS) | $(BUILD)
+	$(CC) $(CFLAGS) $(SAN_FLAGS) -c -o $@ $<
+
+$(SAN_LIB): $(SAN_OBJS)
+	rm -f $@
+	$(AR) rcs $@ $^
+
+$(BUILD)/tests/%: tests/%.c $(wildcard tests/*.h) $(SAN_LIB) $(HEADERS) | $(BUILD)
+	$(CC) $(CFLAGS) $(SAN_FLAGS) $(LDFLAGS) -no-pie -o $@ $< $(SAN_LIB)
 
 install: all
 	install -Dm644 $(LIB) $(DESTDIR)$(LIBDIR)/libctui.a
