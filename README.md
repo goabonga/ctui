@@ -60,6 +60,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   files.
 - **text**: locale-independent UTF-8 decoding and column arithmetic,
   sanitising, word wrapping and clipped drawing helpers.
+- **gauge**: zoned bars and labelled `CPU [████░░░░] 12.0%` gauges coloured
+  by value.
 
 ## Tests
 
