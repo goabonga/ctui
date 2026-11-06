@@ -4,6 +4,7 @@
 #ifndef CTUI_H
 #define CTUI_H
 
+#include <ctui/labels.h>
 #include <ctui/theme.h>
 
 #define CTUI_VERSION "0.0.0"
