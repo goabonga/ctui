@@ -26,6 +26,7 @@
 #include <ctui/helpview.h>
 #include <ctui/hexview.h>
 #include <ctui/histogram.h>
+#include <ctui/image.h>
 #include <ctui/input.h>
 #include <ctui/inputrule.h>
 #include <ctui/keyboard.h>
