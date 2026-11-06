@@ -3,7 +3,11 @@
 
 CC      ?= cc
 CFLAGS  ?= -O2
-CFLAGS  += -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude
+PKG_CONFIG ?= pkg-config
+NCURSES_CFLAGS := $(shell $(PKG_CONFIG) --cflags ncursesw 2>/dev/null || echo -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600)
+NCURSES_LIBS   := $(shell $(PKG_CONFIG) --libs ncursesw 2>/dev/null || echo -lncursesw)
+CFLAGS  += -std=c11 -Wall -Wextra -Wpedantic -Werror -D_POSIX_C_SOURCE=200809L \
+	-Iinclude $(NCURSES_CFLAGS)
 PREFIX  ?= /usr/local
 LIBDIR  ?= $(PREFIX)/lib
 SANITIZE ?= address,undefined
@@ -68,7 +72,8 @@ format-check:
 	clang-format --dry-run -Werror $(SOURCES)
 
 lint:
-	clang-tidy --quiet $(filter %.c,$(SOURCES)) -- -std=c11 -Iinclude
+	clang-tidy --quiet $(filter %.c,$(SOURCES)) -- -std=c11 -D_POSIX_C_SOURCE=200809L -Iinclude \
+		$(NCURSES_CFLAGS)
 
 install: all
 	install -Dm644 $(LIB) $(DESTDIR)$(LIBDIR)/libctui.a

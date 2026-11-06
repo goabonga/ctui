@@ -4,6 +4,8 @@
 #ifndef CTUI_H
 #define CTUI_H
 
+#include <ctui/theme.h>
+
 #define CTUI_VERSION "0.0.0"
 
 /* Returns the library version as a static string, e.g. "0.0.0". */
