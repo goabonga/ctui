@@ -65,6 +65,7 @@
 #include <ctui/toast.h>
 #include <ctui/tree.h>
 #include <ctui/treemap.h>
+#include <ctui/vt.h>
 #include <ctui/waveform.h>
 #include <ctui/wizard.h>
 
