@@ -74,6 +74,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   with an ASCII fallback and an optional label; the frame is a pure function
   of the time the caller passes in (`ctui_spinner_index()`), at 10 frames a second
   unless `fps` says otherwise.
+- **sparkline**: chart of a series, a block per value on one row, or bars
+  rising in eighths of a row on several.
 
 ## Tests
 
