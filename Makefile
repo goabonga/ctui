@@ -26,7 +26,7 @@ SAN_LIB   := $(BUILD)/libctui-san.a
 TEST_SRCS := $(sort $(wildcard tests/test_*.c))
 TEST_BINS := $(TEST_SRCS:tests/%.c=$(BUILD)/tests/%)
 
-.PHONY: all test format format-check lint clean install
+.PHONY: all test check-headers format format-check lint clean install
 
 all: $(LIB)
 
@@ -38,9 +38,9 @@ $(BUILD)/%.o: src/%.c $(HEADERS) | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD):
-	mkdir -p $@ $(BUILD)/san $(BUILD)/tests
+	mkdir -p $@ $(BUILD)/san $(BUILD)/tests $(BUILD)/hdr
 
-test: $(TEST_BINS)
+test: check-headers $(TEST_BINS)
 	@set -e; for t in $(TEST_BINS); do echo "== $$t"; $$t; done
 
 $(BUILD)/san/%.o: src/%.c $(HEADERS) | $(BUILD)
@@ -52,6 +52,14 @@ $(SAN_LIB): $(SAN_OBJS)
 
 $(BUILD)/tests/%: tests/%.c $(wildcard tests/*.h) $(SAN_LIB) $(HEADERS) | $(BUILD)
 	$(CC) $(CFLAGS) $(SAN_FLAGS) $(LDFLAGS) -no-pie -o $@ $< $(SAN_LIB)
+
+# Every public header must compile alone, and twice (include guards).
+check-headers: | $(BUILD)
+	@set -e; for h in $(HEADERS); do \
+	  n=$$(basename $$h .h); \
+	  printf '#include <ctui/%s.h>\n#include <ctui/%s.h>\nint ctui_hdr_check_%s;\n' $$n $$n $$n > $(BUILD)/hdr/$$n.c; \
+	  $(CC) $(CFLAGS) -fsyntax-only $(BUILD)/hdr/$$n.c; \
+	done; echo "headers ok"
 
 format:
 	clang-format -i $(SOURCES)
