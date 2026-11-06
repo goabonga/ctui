@@ -16,6 +16,7 @@
 #include <ctui/layout.h>
 #include <ctui/list.h>
 #include <ctui/meter.h>
+#include <ctui/numinput.h>
 #include <ctui/panel.h>
 #include <ctui/scrollbar.h>
 #include <ctui/scrollview.h>
