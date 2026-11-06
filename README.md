@@ -264,6 +264,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   a point lookup for the mouse.
 - **barchart**: vertical or horizontal bars, side by side or stacked, with
   fine eighth-block lengths and bar lookup for the mouse.
+- **piechart**: pie and donut charts with a legend of shares and slice lookup
+  for the mouse.
 
 ## Tests
 
