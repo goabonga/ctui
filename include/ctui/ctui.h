@@ -4,6 +4,7 @@
 #ifndef CTUI_H
 #define CTUI_H
 
+#include <ctui/barchart.h>
 #include <ctui/bigtext.h>
 #include <ctui/burger.h>
 #include <ctui/canvas.h>
