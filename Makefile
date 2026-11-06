@@ -10,6 +10,9 @@ CFLAGS  += -std=c11 -Wall -Wextra -Wpedantic -Werror -D_POSIX_C_SOURCE=200809L \
 	-Iinclude $(NCURSES_CFLAGS)
 PREFIX  ?= /usr/local
 LIBDIR  ?= $(PREFIX)/lib
+INSTALL ?= install
+# The version is the CTUI_VERSION of the umbrella header, which multicz bumps.
+VERSION := $(shell sed -n 's/^\#define CTUI_VERSION "\(.*\)"/\1/p' include/ctui/ctui.h)
 SANITIZE ?= address,undefined
 BUILD   := build
 
@@ -30,7 +33,7 @@ SAN_LIB   := $(BUILD)/libctui-san.a
 TEST_SRCS := $(sort $(wildcard tests/test_*.c))
 TEST_BINS := $(TEST_SRCS:tests/%.c=$(BUILD)/tests/%)
 
-.PHONY: all test check-headers format format-check lint clean install
+.PHONY: all test check-headers format format-check lint clean install uninstall
 
 all: $(LIB)
 
@@ -75,10 +78,17 @@ lint:
 	clang-tidy --quiet $(filter %.c,$(SOURCES)) -- -std=c11 -D_POSIX_C_SOURCE=200809L -Iinclude \
 		$(NCURSES_CFLAGS)
 
-install: all
-	install -Dm644 $(LIB) $(DESTDIR)$(LIBDIR)/libctui.a
-	install -d $(DESTDIR)$(PREFIX)/include/ctui
-	install -m644 $(HEADERS) $(DESTDIR)$(PREFIX)/include/ctui/
+# DESTDIR stages the files for packaging; the .pc keeps the real PREFIX.
+install: $(LIB)
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)/pkgconfig $(DESTDIR)$(PREFIX)/include/ctui
+	$(INSTALL) -m 644 $(LIB) $(DESTDIR)$(LIBDIR)/libctui.a
+	$(INSTALL) -m 644 $(HEADERS) $(DESTDIR)$(PREFIX)/include/ctui/
+	sed -e 's|@PREFIX@|$(PREFIX)|' -e 's|@LIBDIR@|$(LIBDIR)|' \
+	  -e 's|@VERSION@|$(VERSION)|' ctui.pc.in > $(DESTDIR)$(LIBDIR)/pkgconfig/ctui.pc
+
+uninstall:
+	rm -f $(DESTDIR)$(LIBDIR)/libctui.a $(DESTDIR)$(LIBDIR)/pkgconfig/ctui.pc
+	rm -rf $(DESTDIR)$(PREFIX)/include/ctui
 
 clean:
 	rm -rf $(BUILD)

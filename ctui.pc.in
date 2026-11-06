@@ -1,0 +1,11 @@
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=@LIBDIR@
+includedir=${prefix}/include
+
+Name: ctui
+Description: C library of reusable terminal user interface (TUI) components
+Version: @VERSION@
+Requires: ncursesw
+Libs: -L${libdir} -lctui -lm
+Cflags: -I${includedir}
