@@ -284,6 +284,17 @@ are ignored, and `ctui_labels_load()` reads a single file.
   lookup for the mouse.
 - **calendar**: month grid with a cursor day, marked and selected days, week
   and day views with events, repeat rules and events lasting several days.
+- **calendar_dialog**: a framed dialog, built on `ctui_form`, to edit the
+  recurrence of an event: repeat (none, daily, weekly, monthly, yearly), every
+  N, seven weekday checkboxes (weekly only), start date, end (never, on a
+  date, after N times) and OK / Cancel. Dates are typed as `YYYY-MM-DD` and
+  checked with real calendar rules (month ends, leap years, years 1 to 9999);
+  an invalid date, an end before the start, an interval outside 1 to 10000, a
+  weekly repeat with no weekday or a count below 1 show a message in the
+  dialog and refuse OK, otherwise the next occurrences are previewed. Fields
+  that do not apply are disabled. The values from a rule, the check and the
+  application to an `ctui_cal_recur` (which keeps its exceptions) are pure
+  functions. The demo's Calendar page opens it with `R`.
 
 ## Tests
 
