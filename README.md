@@ -88,6 +88,11 @@ are ignored, and `ctui_labels_load()` reads a single file.
   and popup menus with separators and disabled entries.
 - **toast**: one-row notifications (info, ok, warning, error) stacked in a
   corner, with caller-supplied time for expiry, dismissal and mouse hit testing.
+- **burger**: burger button opening a dropdown menu that stays on screen,
+  scrolls, and answers to the keyboard and the mouse. Entries can open
+  nested submenus (linked with a table of `ctui_menu_link`, marked by an arrow
+  glyph with an ASCII fallback) on the right or, when short of room, on the
+  left; Right/Enter open and Left/Esc close, and clicks and hover follow.
 
 ## Tests
 
