@@ -262,6 +262,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   labels and axis titles, a legend on top, below, on the right or hidden,
   series drawn as lines, points (scatter) or both, gaps for missing values and
   a point lookup for the mouse.
+- **barchart**: vertical or horizontal bars, side by side or stacked, with
+  fine eighth-block lengths and bar lookup for the mouse.
 
 ## Tests
 
