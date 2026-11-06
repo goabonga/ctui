@@ -86,6 +86,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   plain state structs, and a helper centring a dialog of any size.
 - **list**: selectable lists with details, scrolling and mouse hit testing,
   and popup menus with separators and disabled entries.
+- **toast**: one-row notifications (info, ok, warning, error) stacked in a
+  corner, with caller-supplied time for expiry, dismissal and mouse hit testing.
 
 ## Tests
 
