@@ -8,6 +8,7 @@
 #include <ctui/frame.h>
 #include <ctui/gauge.h>
 #include <ctui/labels.h>
+#include <ctui/list.h>
 #include <ctui/meter.h>
 #include <ctui/panel.h>
 #include <ctui/scrollbar.h>
