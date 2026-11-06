@@ -68,6 +68,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   grabbing and dragging, page jumps on the track and mouse wheel support.
 - **tabbar**: powerline tab bar with icons, disabled and closable tabs,
   right-aligned hints and a pure layout shared with mouse hit testing.
+- **statusbar**: powerline status bar with left and right runs of toned
+  segments and automatic hard or soft dividers.
 
 ## Tests
 
