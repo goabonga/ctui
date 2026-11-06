@@ -312,6 +312,9 @@ are ignored, and `ctui_labels_load()` reads a single file.
   range, pan that wraps over the antimeridian and stops at the poles, zoom
   around a point, and the XYZ tiles that cover an area, nearest the centre
   first, with the column wrapped (all pure functions on pixel sizes).
+- **mvt**: decoder for Mapbox Vector Tiles (protobuf, no library): layers, key
+  and value tables, features with their tags and geometry decoded to points
+  and parts; corrupt or truncated tiles are refused, never read past the end.
 
 ## Tests
 
