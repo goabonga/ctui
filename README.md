@@ -112,6 +112,14 @@ are ignored, and `ctui_labels_load()` reads a single file.
   scrollbars appear when needed, with keys, wheel and drag, and pure layout
   and hit functions (`ctui_scrollview_layout_for()`, `ctui_scrollview_hit()`,
   `ctui_scrollview_cell_at()`).
+- **input**: single-line text input on a caller buffer: cursor moves by
+  character, Home / End, word jumps (Shift-Left / Shift-Right), Backspace /
+  Delete, Ctrl-W / Ctrl-U / Ctrl-K, UTF-8 typed byte by byte, wide
+  characters, an optional `*` mask, a `max_chars` limit, a placeholder,
+  sideways scrolling inside its width and a click that places the cursor;
+  `style` overrides its colours. The editing operations work on byte offsets
+  without a screen; there is no selection. The text field of `form` stays
+  append-only.
 
 ## Tests
 
