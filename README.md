@@ -266,6 +266,12 @@ are ignored, and `ctui_labels_load()` reads a single file.
   fine eighth-block lengths and bar lookup for the mouse.
 - **piechart**: pie and donut charts with a legend of shares and slice lookup
   for the mouse.
+- **histogram**: bins caller-owned samples into equal-width bins (a fixed
+  number, or the rule of Sturges, `ceil(log2(n)) + 1`, by default) over the
+  data range rounded out by the canvas axis scale, or over a range set by the
+  caller with optional clamping; vertical bars in eighth blocks, count and
+  value axes with round labels, NaN samples ignored, a pure binning function
+  (`ctui_histogram_bin()`) and bin lookup for the mouse.
 
 ## Tests
 
