@@ -14,9 +14,22 @@ Requires a C11 compiler, GNU make, pkg-config and ncursesw.
 make
 ```
 
-This builds the static library `build/libctui.a`. `make install`
-installs it under `$(PREFIX)/lib` and the headers `include/ctui/*.h` under
-`$(PREFIX)/include/ctui` (default `/usr/local`), honouring `DESTDIR`.
+This builds the static library `build/libctui.a`.
+
+## Use in another project
+
+```sh
+make install PREFIX=/usr/local   # libctui.a, include/ctui/*.h and ctui.pc
+```
+
+`DESTDIR` stages the files for packaging. Then build with pkg-config:
+
+```sh
+cc -o app app.c $(pkg-config --cflags --libs ctui)
+```
+
+and `#include <ctui/ctui.h>` (or a single component header). `make
+uninstall` removes the files.
 
 ## Configuration
 
@@ -392,7 +405,8 @@ make test
 The unit tests run with AddressSanitizer and UndefinedBehaviorSanitizer;
 pass `SANITIZE=` to disable them on platforms that reject them.
 `make test` first checks that every public header compiles on its own
-(`make check-headers`).
+(`make check-headers`) and that a program can be built against the
+installed library with pkg-config (`make check-install`).
 
 ## Code quality
 
