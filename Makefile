@@ -6,6 +6,7 @@ CFLAGS  ?= -O2
 CFLAGS  += -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude
 PREFIX  ?= /usr/local
 LIBDIR  ?= $(PREFIX)/lib
+SANITIZE ?= address,undefined
 BUILD   := build
 
 SRCS    := $(sort $(wildcard src/*.c))
@@ -16,7 +17,9 @@ LIB     := $(BUILD)/libctui.a
 # Unit tests are linked with the library built with the sanitizers.
 # -fno-pie -no-pie: on linux-hardened a PIE lands inside the ASan shadow
 # range.
-SAN_FLAGS := -g -fno-pie -fsanitize=address,undefined -fno-sanitize-recover=all
+# Disable the sanitizers with `make test SANITIZE=` where the platform
+# rejects them.
+SAN_FLAGS := -g -fno-pie $(if $(SANITIZE),-fsanitize=$(SANITIZE) -fno-sanitize-recover=all)
 SAN_OBJS  := $(SRCS:src/%.c=$(BUILD)/san/%.o)
 SAN_LIB   := $(BUILD)/libctui-san.a
 TEST_SRCS := $(sort $(wildcard tests/test_*.c))
