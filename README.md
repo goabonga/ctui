@@ -22,7 +22,9 @@ This builds the static library `build/libctui.a`.
 make install PREFIX=/usr/local   # libctui.a, include/ctui/*.h and ctui.pc
 ```
 
-`DESTDIR` stages the files for packaging. Then build with pkg-config:
+`make shared` builds `build/libctui.so.0.0.0` (SONAME `libctui.so.0`, only the
+`ctui_` symbols are exported) and `make install-shared` installs it with its
+symlinks along with the rest. `DESTDIR` stages the files for packaging. Then build with pkg-config:
 
 ```sh
 cc -o app app.c $(pkg-config --cflags --libs ctui)
@@ -406,7 +408,8 @@ The unit tests run with AddressSanitizer and UndefinedBehaviorSanitizer;
 pass `SANITIZE=` to disable them on platforms that reject them.
 `make test` first checks that every public header compiles on its own
 (`make check-headers`) and that a program can be built against the
-installed library with pkg-config (`make check-install`).
+installed library with pkg-config (`make check-install`) and that the shared library has the right SONAME and
+exports (`make check-shared`).
 
 ## Code quality
 
