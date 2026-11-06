@@ -165,6 +165,10 @@ are ignored, and `ctui_labels_load()` reads a single file.
   (fine adjust with Shift, ten steps with PgUp / PgDn), by dragging or with
   the wheel; optional bipolar mode with a centre detent and a default value
   to reset to. The value-to-position mapping is made of pure functions.
+- **keyboard**: piano keyboard over a range of octaves with white and black
+  keys, held notes shown pressed, a cursor and a selection; the typing keys
+  `a w s e d f t g y h u j k o l p` map to MIDI notes, notes get names such as
+  `C#4`, and a mouse press, drag or release holds the key under the pointer.
 
 ## Tests
 
