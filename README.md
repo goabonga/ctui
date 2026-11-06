@@ -244,6 +244,16 @@ are ignored, and `ctui_labels_load()` reads a single file.
 - **helpview**: key-binding help overlay: caller-owned groups of (keys,
   description) in a scrollable dialog that uses two columns on wide terminals
   and one on narrow ones, with keys and wheel to scroll and close.
+- **palette**: command palette overlay (Ctrl-P in editors): a centred dialog
+  with an input line over a filtered, ranked list of caller-owned commands
+  (name, optional shortcut and description). The fuzzy match is a
+  case-insensitive subsequence by UTF-8 character (ASCII case folding only)
+  scored with bonuses for word starts and consecutive characters
+  (`ctui_palette_score`, documented in `palette.h`); `ctui_palette_filter` returns
+  indices with the matched positions, best first and stable for ties, into a
+  caller-provided buffer, so thousands of commands and every keystroke
+  allocate nothing. Typing, Backspace, Up / Down, PgUp / PgDn, Enter and Esc
+  keys, clicks on entries and the wheel; matched letters are underlined.
 
 ## Tests
 
