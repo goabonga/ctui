@@ -325,6 +325,18 @@ are ignored, and `ctui_labels_load()` reads a single file.
   source's maximum zoom, with segments hugging the tile edges skipped. Keys,
   drag and wheel pan and zoom; `ctui_map_hit()` and `ctui_map_categorize()` are
   pure. The library has no network, SQLite or zlib dependency.
+- **image**: displays a caller-supplied RGB or RGBA pixel buffer (width,
+  height, channels, stride), without any decoding library: half blocks (two
+  pixels per cell), Braille dots (2 x 4 pixels per cell, colour averaged) or
+  an ASCII ramp, chosen by the locale and the colours of the terminal. Colours
+  map to the nearest xterm-256 colour (cube and greys, squared RGB distance),
+  to 16 or 8 colours on smaller terminals, through colour pairs reserved from
+  the theme; when the pairs run out the colours are reduced step by step, and
+  without colours the image is drawn by brightness. Box or nearest scaling,
+  aspect-preserving fit (cells count as 1:2) or stretch, zoom and pan, alpha
+  blended onto a background colour. Scaling, quantising and the layout are
+  pure functions; a small reader loads binary PPM (P6) and PAM files (bounds
+  checked, size capped, malformed files refused). PNG and JPEG are not read.
 
 ## Tests
 
