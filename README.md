@@ -283,7 +283,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   negative, NaN and infinite weights and tiles the area exactly, plus cell
   lookup for the mouse.
 - **calendar**: month grid with a cursor day, marked and selected days, week
-  and day views with events, repeat rules and events lasting several days.
+  and day views with events, repeat rules and events lasting several days. A dialog adds an event with its title and
+  its times, or for the whole day.
 - **calendar_dialog**: a framed dialog, built on `ctui_form`, to edit the
   recurrence of an event: repeat (none, daily, weekly, monthly, yearly), every
   N, seven weekday checkboxes (weekly only), start date, end (never, on a
