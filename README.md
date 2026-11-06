@@ -99,6 +99,14 @@ are ignored, and `ctui_labels_load()` reads a single file.
   selection, a marked rule and mouse hit testing.
 - **wizard**: multi-step flow frame for dialogs: a step indicator, Cancel /
   Back / Next (Finish) buttons, Ctrl-B / Ctrl-N shortcuts and hit testing.
+- **layout**: pure layout engine (no drawing): `ctui_layout_split()` cuts an
+  `ctui_rect` into child rectangles along a row or a column from constraints
+  (length, min, max, percent, ratio, fill with weights), with a margin,
+  spacing and a flex mode for the free space (start, center, end, space
+  between, space around, stretch). Priority is length, then min / max, then
+  percent / ratio, then fill; sizes never exceed the area, never overlap and
+  never overflow. `ctui_layout_shrink()` removes insets and `ctui_layout_center()`
+  centres a rectangle in another. Nest by splitting a returned rectangle.
 
 ## Tests
 
