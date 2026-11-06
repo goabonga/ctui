@@ -76,6 +76,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   unless `fps` says otherwise.
 - **sparkline**: chart of a series, a block per value on one row, or bars
   rising in eighths of a row on several.
+- **panel**: scrollable panel of titled sections of readings with optional
+  gauges and notes, flowing into two columns on wide screens.
 
 ## Tests
 
