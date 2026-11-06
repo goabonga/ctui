@@ -33,6 +33,7 @@
 #include <ctui/statusbar.h>
 #include <ctui/stepseq.h>
 #include <ctui/tabbar.h>
+#include <ctui/table.h>
 #include <ctui/tabpanel.h>
 #include <ctui/text.h>
 #include <ctui/textarea.h>
