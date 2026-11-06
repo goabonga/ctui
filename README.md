@@ -232,6 +232,12 @@ are ignored, and `ctui_labels_load()` reads a single file.
   fixed and flexible columns, alignment, a header whose click asks for a
   sort (`ctui_table_sort_indices()` gives a stable order), selection by keys
   and mouse, a scrollbar and text cut with the ellipsis.
+- **waveform**: zoomable waveform view with cursor, selection and playhead
+  over interleaved float samples; a range is selected with keys or by
+  pressing and dragging the mouse, and `ctui_waveform_reset()` shows the whole
+  signal again; `filled` draws solid bars in half rows instead of thin lines,
+  in the info tone of the header up to the playhead and in its idle tone
+  after it.
 
 ## Tests
 
