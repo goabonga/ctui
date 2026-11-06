@@ -17,6 +17,7 @@
 #include <ctui/spinner.h>
 #include <ctui/statusbar.h>
 #include <ctui/tabbar.h>
+#include <ctui/tabpanel.h>
 #include <ctui/text.h>
 #include <ctui/theme.h>
 #include <ctui/toast.h>
