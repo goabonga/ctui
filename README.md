@@ -228,6 +228,10 @@ are ignored, and `ctui_labels_load()` reads a single file.
   (End or `f` resumes), cut or wrapped messages, a record-number or time
   gutter, a scrollbar, keys, wheel, scrollbar drag and selection of a record
   by click, with pure layout and hit functions. Single UI thread only.
+- **table**: table of caller-owned rows read through a cell accessor, with
+  fixed and flexible columns, alignment, a header whose click asks for a
+  sort (`ctui_table_sort_indices()` gives a stable order), selection by keys
+  and mouse, a scrollbar and text cut with the ellipsis.
 
 ## Tests
 
