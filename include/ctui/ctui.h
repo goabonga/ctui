@@ -19,6 +19,7 @@
 #include <ctui/list.h>
 #include <ctui/meter.h>
 #include <ctui/numinput.h>
+#include <ctui/pads.h>
 #include <ctui/panel.h>
 #include <ctui/picker.h>
 #include <ctui/scrollbar.h>
