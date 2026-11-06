@@ -33,7 +33,7 @@ SAN_LIB   := $(BUILD)/libctui-san.a
 TEST_SRCS := $(sort $(wildcard tests/test_*.c))
 TEST_BINS := $(TEST_SRCS:tests/%.c=$(BUILD)/tests/%)
 
-.PHONY: all test check-headers format format-check lint clean install uninstall
+.PHONY: all test check-headers check-install format format-check lint clean install uninstall
 
 all: $(LIB)
 
@@ -47,7 +47,7 @@ $(BUILD)/%.o: src/%.c $(HEADERS) | $(BUILD)
 $(BUILD):
 	mkdir -p $@ $(BUILD)/san $(BUILD)/tests $(BUILD)/hdr
 
-test: check-headers $(TEST_BINS)
+test: check-headers check-install $(TEST_BINS)
 	@set -e; for t in $(TEST_BINS); do echo "== $$t"; $$t; done
 
 $(BUILD)/san/%.o: src/%.c $(HEADERS) | $(BUILD)
@@ -67,6 +67,17 @@ check-headers: | $(BUILD)
 	  printf '#include <ctui/%s.h>\n#include <ctui/%s.h>\nint ctui_hdr_check_%s;\n' $$n $$n $$n > $(BUILD)/hdr/$$n.c; \
 	  $(CC) $(CFLAGS) -fsyntax-only $(BUILD)/hdr/$$n.c; \
 	done; echo "headers ok"
+
+# Install under build/stage and build tests/consumer.c with pkg-config only,
+# the way another project would use the library.
+STAGE := $(abspath $(BUILD))/stage
+check-install: $(LIB)
+	@$(MAKE) --no-print-directory uninstall PREFIX=$(STAGE) DESTDIR= >/dev/null
+	@$(MAKE) --no-print-directory install PREFIX=$(STAGE) DESTDIR= >/dev/null
+	@export PKG_CONFIG_PATH=$(STAGE)/lib/pkgconfig; \
+	  $(CC) -std=c11 -Wall -Wextra -Wpedantic -Werror $(LDFLAGS) \
+	  $$($(PKG_CONFIG) --cflags ctui) -o $(BUILD)/consumer tests/consumer.c \
+	  $$($(PKG_CONFIG) --libs ctui) && $(BUILD)/consumer && echo "install ok"
 
 format:
 	clang-format -i $(SOURCES)
