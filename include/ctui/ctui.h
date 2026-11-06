@@ -7,6 +7,11 @@
 #include <ctui/barchart.h>
 #include <ctui/bigtext.h>
 #include <ctui/burger.h>
+#include <ctui/calendar.h>
+#include <ctui/calendar_color.h>
+#include <ctui/calendar_month.h>
+#include <ctui/calendar_select.h>
+#include <ctui/calendar_view.h>
 #include <ctui/canvas.h>
 #include <ctui/dialog.h>
 #include <ctui/durationinput.h>
