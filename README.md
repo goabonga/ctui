@@ -272,6 +272,11 @@ are ignored, and `ctui_labels_load()` reads a single file.
   caller with optional clamping; vertical bars in eighth blocks, count and
   value axes with round labels, NaN samples ignored, a pure binning function
   (`ctui_histogram_bin()`) and bin lookup for the mouse.
+- **heatmap**: grid of caller-owned values (rows x cols) on a sequential
+  colour ramp taken from the palette (info, accent, cyan, green, yellow, red),
+  with density characters instead without colours or UTF-8, optional row and
+  column labels, a min / max legend, NaN cells left empty, a cursor moved with
+  the arrow keys, and cell lookup (row, column, value) for the mouse.
 
 ## Tests
 
