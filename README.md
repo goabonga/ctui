@@ -220,6 +220,14 @@ are ignored, and `ctui_labels_load()` reads a single file.
   so a big file keeps the interface responsive, `ctui_hexview_find_next()`
   wraps once and selects the match, and `ctui_hexview_goto()` moves the cursor
   to an offset. Searches see the edited bytes.
+- **logview**: log viewer over a bounded ring of records (time in seconds,
+  level trace to error, source tag, message) copied into the ring and
+  sanitised, with levels coloured by the theme, a per-level visibility
+  filter, a case-insensitive text filter with highlighted matches, follow
+  mode that sticks to the newest record and stops when the user scrolls up
+  (End or `f` resumes), cut or wrapped messages, a record-number or time
+  gutter, a scrollbar, keys, wheel, scrollbar drag and selection of a record
+  by click, with pure layout and hit functions. Single UI thread only.
 
 ## Tests
 
