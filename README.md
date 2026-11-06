@@ -8,13 +8,38 @@ A C library of reusable terminal user interface (TUI) components.
 
 ## Build
 
+Requires a C11 compiler, GNU make, pkg-config and ncursesw.
+
 ```bash
 make
 ```
 
 This builds the static library `build/libctui.a`. `make install`
-installs it under `$(PREFIX)/lib` and the header `include/ctui/ctui.h` under
+installs it under `$(PREFIX)/lib` and the headers `include/ctui/*.h` under
 `$(PREFIX)/include/ctui` (default `/usr/local`), honouring `DESTDIR`.
+
+## Configuration
+
+Everything the components draw comes from a global configuration with
+built-in defaults; set it once, before `ctui_theme_init()`:
+
+```c
+ctui_palette colors = ctui_palette_default();
+colors.info = 24;                      /* xterm-256 indexes */
+ctui_theme_set_palette(&colors);       /* NULL restores the default */
+
+ctui_glyphs glyphs = *ctui_theme_glyphs_for(true);
+glyphs.scroll_thumb = "#";
+ctui_theme_set_glyphs(&glyphs, NULL);  /* Unicode set, ASCII set */
+```
+
+Glyphs fall back to ASCII when the locale is not UTF-8 or when `CTUI_ASCII`
+is set; `NO_COLOR` disables colours.
+
+## Components
+
+- **theme**: Solarized powerline palette, colour pairs, tones, glyph sets
+  with ASCII and monochrome fallbacks.
 
 ## Tests
 
