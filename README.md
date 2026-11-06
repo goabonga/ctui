@@ -363,6 +363,25 @@ are ignored, and `ctui_labels_load()` reads a single file.
   1015, window operations, cursor styles, soft reset, sixel and REP. Sizes,
   parameters, OSC strings, titles and the response queue are all bounded;
   `tests/test_vt.c` includes a fuzz test.
+- **terminal**: embedded terminal. It runs a program (argv and environment
+  chosen by the caller, `$SHELL` or `/bin/sh` by default, `TERM` set to
+  `xterm-256color`) on a pty created with `forkpty()` (in glibc's libc since
+  2.34; older systems need `-lutil`) and draws the `vt` screen in a rectangle
+  with the colours quantised to the terminal (truecolour to the 256 cube) from
+  a pool of colour pairs of its own, which degrades to uncoloured text when it
+  is used up; bold, dim, italic, underline and reverse are mapped, the cursor is
+  a reverse cell. Output is read without blocking, at most 64 KiB per frame.
+  The pty follows the size of the rectangle (the program gets `SIGWINCH`); one
+  column holds a scrollbar over the history. Keys are translated from curses to
+  xterm sequences (arrows, Home / End, Ins / Del, PgUp / PgDn, F1-F12 and
+  their Shift / Ctrl variants, application cursor mode, Alt as an ESC prefix,
+  bracketed paste; `ctui_terminal_register_keys()` makes curses report the
+  modified arrows), the mouse is forwarded in the SGR or X10 encoding when
+  the program asked for it, and otherwise the wheel and Shift-PgUp scroll the
+  local history. The exit code or signal of the child is kept; `free` hangs it
+  up (SIGHUP to its process group, SIGKILL after 300 ms), closes the pty and
+  reaps it, so no zombie is left. The widget runs whatever program the caller
+  names and does nothing about networks or privileges. No selection or copy.
 
 ## Tests
 
