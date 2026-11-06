@@ -254,6 +254,10 @@ are ignored, and `ctui_labels_load()` reads a single file.
   caller-provided buffer, so thousands of commands and every keystroke
   allocate nothing. Typing, Backspace, Up / Down, PgUp / PgDn, Enter and Esc
   keys, clicks on entries and the wheel; matched letters are underlined.
+- **canvas**: dot canvas (2 x 4 Braille dots per cell, one colour per cell)
+  with lines (also clipped ones, with fractional ends far off the canvas),
+  polylines, rectangles and circles (outlined or filled), and round axis scales
+  for the charts.
 
 ## Tests
 
