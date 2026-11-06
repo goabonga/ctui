@@ -296,6 +296,13 @@ are ignored, and `ctui_labels_load()` reads a single file.
   that do not apply are disabled. The values from a rule, the check and the
   application to an `ctui_cal_recur` (which keeps its exceptions) are pure
   functions. The demo's Calendar page opens it with `R`.
+- **dateinput**: date field `YYYY-MM-DD` edited segment by segment (digits,
+  Up / Down, Left / Right, wheel and click on a segment), always a real
+  calendar date (month ends, leap years, years 1 to 9999), with a month
+  picker built on `ctui_calendar` opened by Enter or a click on the arrow. The
+  value converts to and from the day count of `calendar.h`
+  (`ctui_dateinput_days()`); `ctui_dateinput_parse()`, `ctui_dateinput_format()`
+  and `ctui_dateinput_valid()` are pure; `style` overrides its colours.
 
 ## Tests
 
