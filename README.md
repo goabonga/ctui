@@ -128,6 +128,13 @@ are ignored, and `ctui_labels_load()` reads a single file.
   `ctui_rule_card` (digits in groups of four, Luhn checksum); a program adds
   its own the same way. The functions that apply a rule and
   `ctui_luhn_valid()` are pure.
+- **numinput**: integer or decimal field with min, max, step and a unit
+  suffix: Up / Down, PgUp / PgDn, Home / End, wheel and the `-` / `+`
+  buttons change it, and typed digits are validated as they come (sign,
+  decimal point, fraction digits, range). Numbers are read and written
+  without the C locale, with at most 15 significant digits, so parsing
+  cannot overflow (`ctui_numinput_parse()`, `ctui_numinput_format()`);
+  `style` overrides its colours.
 
 ## Tests
 
