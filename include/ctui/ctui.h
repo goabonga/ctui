@@ -10,6 +10,7 @@
 #include <ctui/form.h>
 #include <ctui/frame.h>
 #include <ctui/gauge.h>
+#include <ctui/hexview.h>
 #include <ctui/input.h>
 #include <ctui/inputrule.h>
 #include <ctui/keyboard.h>
