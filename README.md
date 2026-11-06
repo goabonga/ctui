@@ -155,6 +155,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
 - **form**: labelled fields aligned on their labels: text (optionally masked),
   checkbox, select with a dropdown, slider and list, with focus movement,
   scrolling and mouse support; drawn on the page or inside a dialog.
+- **picker**: centred file, folder and file-or-folder chooser dialogs browsing one folder at a
+  time, with hidden-file toggle, sizes, icons and mouse support.
 
 ## Tests
 
