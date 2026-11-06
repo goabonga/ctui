@@ -24,6 +24,7 @@
 #include <ctui/meter.h>
 #include <ctui/numinput.h>
 #include <ctui/pads.h>
+#include <ctui/palette.h>
 #include <ctui/panel.h>
 #include <ctui/picker.h>
 #include <ctui/richtext.h>
