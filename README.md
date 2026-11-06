@@ -182,6 +182,13 @@ are ignored, and `ctui_labels_load()` reads a single file.
 - **textview**: read-only text view with line-number gutter, cursor,
   selection, tab stops, wide characters and scrolling, sideways too with an
   optional horizontal scrollbar under the text (the gutter stays fixed).
+- **textarea**: multi-line UTF-8 editor on the same column arithmetic as
+  textview: typing, Enter, Tab, character-wise Backspace and Delete, cursor
+  moves with a goal column, selection with Shift+arrows, an internal
+  clipboard (cut, copy, paste), bounded undo and redo that coalesces typing,
+  a modified flag, an optional size limit, a read-only mode, an optional
+  line-number gutter, and mouse click and drag; the editing operations work
+  on byte offsets without a screen.
 
 ## Tests
 
