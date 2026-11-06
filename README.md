@@ -169,6 +169,10 @@ are ignored, and `ctui_labels_load()` reads a single file.
   keys, held notes shown pressed, a cursor and a selection; the typing keys
   `a w s e d f t g y h u j k o l p` map to MIDI notes, notes get names such as
   `C#4`, and a mouse press, drag or release holds the key under the pointer.
+- **pads**: grid of trigger pads (up to 8 x 8, 4 x 4 by default) with labels,
+  a velocity level shown in green, yellow or red that decays with a time given
+  by the caller, a cursor, the 1234 / qwer / asdf / zxcv key mapping, and
+  mouse press, drag and release with the velocity set by where the pad is hit.
 
 ## Tests
 
