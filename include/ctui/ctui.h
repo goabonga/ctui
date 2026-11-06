@@ -32,6 +32,7 @@
 #include <ctui/tabbar.h>
 #include <ctui/tabpanel.h>
 #include <ctui/text.h>
+#include <ctui/textarea.h>
 #include <ctui/textview.h>
 #include <ctui/theme.h>
 #include <ctui/timeinput.h>
