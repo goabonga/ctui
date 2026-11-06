@@ -258,6 +258,10 @@ are ignored, and `ctui_labels_load()` reads a single file.
   with lines (also clipped ones, with fractional ends far off the canvas),
   polylines, rectangles and circles (outlined or filled), and round axis scales
   for the charts.
+- **linechart**: multi-series line chart with a labelled y axis, optional x
+  labels and axis titles, a legend on top, below, on the right or hidden,
+  series drawn as lines, points (scatter) or both, gaps for missing values and
+  a point lookup for the mouse.
 
 ## Tests
 
