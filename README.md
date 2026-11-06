@@ -238,6 +238,9 @@ are ignored, and `ctui_labels_load()` reads a single file.
   signal again; `filled` draws solid bars in half rows instead of thin lines,
   in the info tone of the header up to the playhead and in its idle tone
   after it.
+- **bigtext**: large text in a 3 x 5 block font (digits, letters, space and
+  `: . - /`; lowercase is drawn as uppercase, any other character blank), with
+  `ctui_bigtext_width()` to measure, clipping to a column budget and a colour pair.
 
 ## Tests
 
