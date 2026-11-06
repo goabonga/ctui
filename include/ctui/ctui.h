@@ -23,6 +23,7 @@
 #include <ctui/picker.h>
 #include <ctui/scrollbar.h>
 #include <ctui/scrollview.h>
+#include <ctui/slider.h>
 #include <ctui/sparkline.h>
 #include <ctui/spinner.h>
 #include <ctui/statusbar.h>
