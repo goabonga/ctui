@@ -231,7 +231,7 @@ jobs:
           version=${TAG#v}
           name="ctui-${version}-linux-x86_64"
           mkdir -p "dist/${name}"
-          cp build/libctui.a include/ctui/ctui.h LICENSE README.md "dist/${name}/"
+          cp -r build/libctui.a include ctui.pc.in LICENSE README.md "dist/${name}/"
           tar -C dist -czf "dist/${name}.tar.gz" "$name"
           rm -rf "dist/${name}"
           (cd dist && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256")
