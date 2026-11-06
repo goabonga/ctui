@@ -35,6 +35,7 @@
 #include <ctui/linechart.h>
 #include <ctui/list.h>
 #include <ctui/logview.h>
+#include <ctui/map.h>
 #include <ctui/meter.h>
 #include <ctui/mvt.h>
 #include <ctui/numinput.h>
