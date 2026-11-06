@@ -344,6 +344,25 @@ are ignored, and `ctui_labels_load()` reads a single file.
   nothing). Scaling, quantising and the layout are
   pure functions; a small reader loads binary PPM (P6) and PAM files (bounds
   checked, size capped, malformed files refused). PNG and JPEG are not read.
+- **vt**: VT100 / xterm terminal emulator with no curses and no pty: feed it the
+  bytes a program printed and read back a grid of cells (code point, width,
+  colours, bold / dim / italic / underline / reverse / hidden), the cursor,
+  the modes and the title. It handles UTF-8 (invalid input becomes U+FFFD),
+  wide characters and combining marks, cursor movement and save / restore,
+  erase, insert / delete of lines and characters, scroll regions, scrolling,
+  tab stops, autowrap with the deferred-wrap behaviour, origin mode, SGR with
+  16, 256 and truecolour colours (kept as RGB), the DEC special graphics set,
+  the alternate screen (47, 1047, 1049), and tracks as state the cursor
+  visibility, application cursor keys and keypad, bracketed paste, mouse
+  reporting (1000, 1002, 1003, 1004, 1006) and OSC 0 / 2 titles. The primary
+  screen keeps a bounded scrollback; resizing truncates or extends, it never
+  reflows. Cursor position and status reports and device attributes are
+  queued for the host to write back. Not supported (parsed and ignored): DCS,
+  APC, PM, SOS and other OSC strings (colours, hyperlinks, clipboard), 8-bit
+  C1 controls, double-size lines, left-right margins, mouse encodings 1005 and
+  1015, window operations, cursor styles, soft reset, sixel and REP. Sizes,
+  parameters, OSC strings, titles and the response queue are all bounded;
+  `tests/test_vt.c` includes a fuzz test.
 
 ## Tests
 
