@@ -14,6 +14,7 @@
 #include <ctui/meter.h>
 #include <ctui/panel.h>
 #include <ctui/scrollbar.h>
+#include <ctui/scrollview.h>
 #include <ctui/sparkline.h>
 #include <ctui/spinner.h>
 #include <ctui/statusbar.h>
