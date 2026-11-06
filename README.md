@@ -97,6 +97,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   file-type icons (Nerd Font glyphs with an ASCII fallback).
 - **tabpanel**: tab strip for panels inside a page or a dialog, with keyboard
   selection, a marked rule and mouse hit testing.
+- **wizard**: multi-step flow frame for dialogs: a step indicator, Cancel /
+  Back / Next (Finish) buttons, Ctrl-B / Ctrl-N shortcuts and hit testing.
 
 ## Tests
 
