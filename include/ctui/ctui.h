@@ -36,6 +36,7 @@
 #include <ctui/list.h>
 #include <ctui/logview.h>
 #include <ctui/meter.h>
+#include <ctui/mvt.h>
 #include <ctui/numinput.h>
 #include <ctui/pads.h>
 #include <ctui/palette.h>
