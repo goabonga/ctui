@@ -203,6 +203,23 @@ are ignored, and `ctui_labels_load()` reads a single file.
   span is under a cell. The demo's Rich page cycles the alignment with `a`,
   toggles wrapping with `w` and the ellipsis with `e`, scrolls with the arrows,
   Page keys and wheel, and reports clicks on its links.
+- **hexview**: hexadecimal viewer for binary data held in memory or read from
+  a file: offsets, bytes and printable text in rows of 16, 8 or 4 bytes
+  according to the width, with cursor, selection, scrolling and mouse
+  support; non-printable bytes are drawn as `.`. `ctui_hexview_map()` maps a
+  file read-only with no size limit (reading it with `ctui_hexview_load()` is
+  capped); bytes are read through `ctui_hexview_byte()`. A mapped file that is
+  truncated by another process makes reads past the new end raise SIGBUS.
+  Bytes can be edited in place of the data: edits are an overlay (the source
+  buffer and the mapping are never written), typed as hex digits or as text
+  in the pane chosen with Tab, drawn with the error colour, and
+  `ctui_hexview_save()` writes the result through a temporary file, so it can
+  replace the file being viewed.
+  `ctui_hexview_parse()` turns typed text (hex digits, "quoted text" or plain
+  text) into a pattern; `ctui_hexview_find()` scans for it in budgeted slices
+  so a big file keeps the interface responsive, `ctui_hexview_find_next()`
+  wraps once and selects the match, and `ctui_hexview_goto()` moves the cursor
+  to an offset. Searches see the edited bytes.
 
 ## Tests
 
