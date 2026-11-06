@@ -22,6 +22,7 @@
 #include <ctui/pads.h>
 #include <ctui/panel.h>
 #include <ctui/picker.h>
+#include <ctui/richtext.h>
 #include <ctui/scrollbar.h>
 #include <ctui/scrollview.h>
 #include <ctui/slider.h>
