@@ -58,6 +58,7 @@
 #include <ctui/textarea.h>
 #include <ctui/textview.h>
 #include <ctui/theme.h>
+#include <ctui/tilecache.h>
 #include <ctui/timeinput.h>
 #include <ctui/toast.h>
 #include <ctui/tree.h>
