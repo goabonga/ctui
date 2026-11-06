@@ -107,6 +107,11 @@ are ignored, and `ctui_labels_load()` reads a single file.
   percent / ratio, then fill; sizes never exceed the area, never overlap and
   never overflow. `ctui_layout_shrink()` removes insets and `ctui_layout_center()`
   centres a rectangle in another. Nest by splitting a returned rectangle.
+- **scrollview**: scrollable viewport over a virtual area of any size, drawn
+  by a callback that receives the visible origin; vertical and horizontal
+  scrollbars appear when needed, with keys, wheel and drag, and pure layout
+  and hit functions (`ctui_scrollview_layout_for()`, `ctui_scrollview_hit()`,
+  `ctui_scrollview_cell_at()`).
 
 ## Tests
 
