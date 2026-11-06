@@ -160,6 +160,11 @@ are ignored, and `ctui_labels_load()` reads a single file.
 - **slider**: standalone horizontal or vertical fader with a filled track, knob,
   label and value, an optional centre mark for bipolar values, keys, and mouse
   press, drag and wheel mapped to the value by pure functions.
+- **knob**: rotary knob drawn in five rows (a dial of Unicode or ASCII cells,
+  the label and the value): a value on a step grid, turned with the keys
+  (fine adjust with Shift, ten steps with PgUp / PgDn), by dragging or with
+  the wheel; optional bipolar mode with a centre detent and a default value
+  to reset to. The value-to-position mapping is made of pure functions.
 
 ## Tests
 
