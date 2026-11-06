@@ -4,6 +4,7 @@
 #ifndef CTUI_H
 #define CTUI_H
 
+#include <ctui/gauge.h>
 #include <ctui/labels.h>
 #include <ctui/text.h>
 #include <ctui/theme.h>
