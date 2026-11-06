@@ -173,6 +173,12 @@ are ignored, and `ctui_labels_load()` reads a single file.
   a velocity level shown in green, yellow or red that decays with a time given
   by the caller, a cursor, the 1234 / qwer / asdf / zxcv key mapping, and
   mouse press, drag and release with the velocity set by where the pad is hit.
+- **stepseq**: step sequencer grid in the style of drum machines: tracks of 16
+  or 32 steps held in caller-owned words, optional per-step velocity shown as
+  the height of the cell, beat groups, playhead column, cursor, keys, and
+  mouse toggling and painting with the wheel for velocity; pure helpers
+  (`ctui_stepseq_bit_*`, `ctui_stepseq_wrap()`) let a sequencer engine work on the
+  same data.
 
 ## Tests
 
