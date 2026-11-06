@@ -1,0 +1,338 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Chris <goabonga@pm.me> */
+
+/*
+ * test_form.c - form fields: values, keys, layout and mouse handling.
+ */
+#include <curses.h>
+
+#include "check.h"
+#include <ctui/form.h>
+
+static const char *const SHADES[] = {"red", "green", "blue", "cyan"};
+#define NSHADES (sizeof SHADES / sizeof SHADES[0])
+
+static void test_constructors(void)
+{
+	char buf[8] = "xx";
+	ctui_field t = ctui_field_text("Name", buf, sizeof buf);
+	CHECK(t.kind == CTUI_FIELD_TEXT && t.capacity == 8);
+
+	ctui_field s = ctui_field_slider("Volume", 0, 10, 0, 50, -3);
+	CHECK_NEAR(s.value, 10, 1e-9); /* clamped */
+	CHECK_NEAR(s.step, 0.5, 1e-9); /* a step of 0 means 20 steps */
+	CHECK(s.decimals == 0);
+
+	ctui_field c = ctui_field_select("Colour", SHADES, NSHADES, 9);
+	CHECK(c.choice == 0); /* out of range */
+	ctui_field l = ctui_field_list("Colours", SHADES, NSHADES, 2, 0);
+	CHECK(l.choice == 2 && l.rows == 1);
+	CHECK(l.first == 2); /* the initial choice is visible */
+}
+
+static void test_init_skips_disabled(void)
+{
+	char a[4] = "", b[4] = "";
+	ctui_field fields[] = {ctui_field_text("A", a, 4),
+			       ctui_field_text("B", b, 4)};
+	fields[0].disabled = true;
+	ctui_form f;
+	ctui_form_init(&f, fields, 2);
+	CHECK(f.focus == 1);
+	CHECK(!f.dialog && !f.blurred);
+}
+
+static void test_text(void)
+{
+	char buf[6] = "";
+	ctui_field fields[] = {ctui_field_text("Name", buf, sizeof buf)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 1);
+	CHECK(ctui_form_editing(&f));
+	CHECK(ctui_form_key(&f, 'a') == CTUI_FORM_CHANGED);
+	ctui_form_key(&f, 'b');
+	CHECK_STR(buf, "ab");
+	for (int i = 0; i < 10; i++)
+		ctui_form_key(&f, 'z');
+	CHECK(strlen(buf) == 5); /* capacity minus the NUL */
+	CHECK(ctui_form_key(&f, 'q') == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, KEY_BACKSPACE) == CTUI_FORM_CHANGED);
+	CHECK(strlen(buf) == 4);
+	CHECK(ctui_form_key(&f, 21) == CTUI_FORM_CHANGED);
+	CHECK_STR(buf, "");
+	CHECK(ctui_form_key(&f, 21) == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, KEY_BACKSPACE) == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, '\n') == CTUI_FORM_SUBMITTED);
+	CHECK(ctui_form_key(&f, 27) == CTUI_FORM_CANCELLED);
+}
+
+static void test_text_backspace_utf8(void)
+{
+	char buf[16] = "";
+	ctui_field fields[] = {ctui_field_text("Name", buf, sizeof buf)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 1);
+	ctui_form_key(&f, 0xC3);
+	ctui_form_key(&f, 0xA9); /* e-acute, two bytes */
+	CHECK_STR(buf, "\xc3\xa9");
+	ctui_form_key(&f, KEY_BACKSPACE);
+	CHECK_STR(buf, "");
+}
+
+static void test_check(void)
+{
+	ctui_field fields[] = {
+	    ctui_field_check("Enabled", "turn it on", false)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 1);
+	CHECK(!ctui_form_editing(&f));
+	CHECK(ctui_form_key(&f, ' ') == CTUI_FORM_CHANGED);
+	CHECK(fields[0].checked);
+	CHECK(ctui_form_key(&f, ' ') == CTUI_FORM_CHANGED);
+	CHECK(!fields[0].checked);
+	CHECK(ctui_form_key(&f, 'x') == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, '\n') == CTUI_FORM_SUBMITTED);
+}
+
+static void test_select_cycles(void)
+{
+	ctui_field fields[] = {ctui_field_select("Colour", SHADES, NSHADES, 0)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 1);
+	CHECK(ctui_form_key(&f, KEY_LEFT) == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, KEY_RIGHT) == CTUI_FORM_CHANGED);
+	CHECK(fields[0].choice == 1);
+	ctui_form_key(&f, KEY_RIGHT);
+	ctui_form_key(&f, KEY_RIGHT);
+	CHECK(fields[0].choice == 3);
+	CHECK(ctui_form_key(&f, KEY_RIGHT) == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, KEY_LEFT) == CTUI_FORM_CHANGED);
+	CHECK(fields[0].choice == 2);
+}
+
+static void test_select_dropdown(void)
+{
+	ctui_field fields[] = {ctui_field_select("Colour", SHADES, NSHADES, 1)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 1);
+	CHECK(ctui_form_key(&f, '\n') == CTUI_FORM_MOVED);
+	CHECK(f.dropdown && f.pending == 1 && ctui_form_editing(&f));
+	ctui_form_key(&f, KEY_DOWN);
+	ctui_form_key(&f, KEY_DOWN);
+	ctui_form_key(&f, KEY_DOWN);
+	CHECK(f.pending == 3);
+	CHECK(fields[0].choice == 1); /* not chosen yet */
+	ctui_form_key(&f, KEY_HOME);
+	CHECK(f.pending == 0);
+	CHECK(ctui_form_key(&f, '\n') == CTUI_FORM_CHANGED);
+	CHECK(!f.dropdown && fields[0].choice == 0);
+
+	/* Esc closes the dropdown without choosing and without cancelling */
+	ctui_form_key(&f, ' ');
+	ctui_form_key(&f, KEY_END);
+	CHECK(ctui_form_key(&f, 27) == CTUI_FORM_MOVED);
+	CHECK(!f.dropdown && fields[0].choice == 0);
+
+	/* choosing the current option is not a change */
+	ctui_form_key(&f, ' ');
+	CHECK(ctui_form_key(&f, ' ') == CTUI_FORM_MOVED);
+}
+
+static void test_slider(void)
+{
+	ctui_field fields[] = {ctui_field_slider("Volume", 0, 100, 5, 50, 0)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 1);
+	CHECK(ctui_form_key(&f, KEY_RIGHT) == CTUI_FORM_CHANGED);
+	CHECK_NEAR(fields[0].value, 55, 1e-9);
+	ctui_form_key(&f, KEY_LEFT);
+	ctui_form_key(&f, KEY_LEFT);
+	CHECK_NEAR(fields[0].value, 45, 1e-9);
+	ctui_form_key(&f, KEY_NPAGE);
+	CHECK_NEAR(fields[0].value, 95, 1e-9);
+	ctui_form_key(&f, KEY_NPAGE);
+	CHECK_NEAR(fields[0].value, 100, 1e-9);
+	CHECK(ctui_form_key(&f, KEY_RIGHT) == CTUI_FORM_NONE);
+	ctui_form_key(&f, KEY_HOME);
+	CHECK_NEAR(fields[0].value, 0, 1e-9);
+	CHECK(ctui_form_key(&f, KEY_LEFT) == CTUI_FORM_NONE);
+	ctui_form_key(&f, KEY_END);
+	CHECK_NEAR(fields[0].value, 100, 1e-9);
+}
+
+static void test_slider_float_steps(void)
+{
+	ctui_field fields[] = {ctui_field_slider("Gain", 0, 1, 0.1, 0, 1)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 1);
+	for (int i = 0; i < 3; i++)
+		ctui_form_key(&f, KEY_RIGHT);
+	CHECK_NEAR(fields[0].value, 0.3, 1e-12); /* snapped, no drift */
+}
+
+static void test_list(void)
+{
+	ctui_field fields[] = {
+	    ctui_field_list("Colours", SHADES, NSHADES, 0, 2)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 1);
+	CHECK(ctui_form_key(&f, KEY_UP) == CTUI_FORM_NONE); /* nothing before */
+	CHECK(ctui_form_key(&f, KEY_DOWN) == CTUI_FORM_CHANGED);
+	CHECK(ctui_form_key(&f, KEY_DOWN) == CTUI_FORM_CHANGED);
+	CHECK(fields[0].choice == 2 && fields[0].first == 1);
+	ctui_form_key(&f, KEY_END);
+	CHECK(fields[0].choice == 3 && fields[0].first == 2);
+	ctui_form_key(&f, KEY_HOME);
+	CHECK(fields[0].choice == 0 && fields[0].first == 0);
+	ctui_form_key(&f, KEY_NPAGE);
+	CHECK(fields[0].choice == 2);
+	ctui_form_key(&f, KEY_PPAGE);
+	CHECK(fields[0].choice == 0);
+	CHECK(ctui_form_key(&f, '\n') == CTUI_FORM_SUBMITTED);
+}
+
+static void test_focus_moves(void)
+{
+	char a[4] = "", b[4] = "";
+	const char *const two[] = {"one", "two"};
+	ctui_field fields[] = {
+	    ctui_field_text("A", a, 4),
+	    ctui_field_check("B", NULL, false),
+	    ctui_field_text("C", b, 4),
+	    ctui_field_list("D", two, 2, 0, 2),
+	};
+	fields[2].disabled = true;
+	ctui_form f;
+	ctui_form_init(&f, fields, 4);
+	CHECK(ctui_form_key(&f, KEY_UP) == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, KEY_DOWN) == CTUI_FORM_MOVED && f.focus == 1);
+	CHECK(ctui_form_key(&f, KEY_DOWN) == CTUI_FORM_MOVED &&
+	      f.focus == 3); /* skips C */
+	CHECK(ctui_form_key(&f, KEY_DOWN) ==
+	      CTUI_FORM_CHANGED);			      /* list: choice */
+	CHECK(ctui_form_key(&f, KEY_DOWN) == CTUI_FORM_NONE); /* last of all */
+	CHECK(ctui_form_key(&f, KEY_UP) == CTUI_FORM_CHANGED);
+	CHECK(ctui_form_key(&f, KEY_UP) == CTUI_FORM_MOVED &&
+	      f.focus == 1); /* leaves the list */
+	CHECK(ctui_form_key(&f, KEY_BTAB) == CTUI_FORM_MOVED && f.focus == 0);
+	CHECK(ctui_form_key(&f, '\t') == CTUI_FORM_MOVED && f.focus == 1);
+}
+
+static void test_rows_and_slots(void)
+{
+	char a[4] = "";
+	ctui_field fields[] = {
+	    ctui_field_text("Name", a, 4),
+	    ctui_field_check("Enabled", NULL, false),
+	    ctui_field_list("Colours", SHADES, NSHADES, 0, 3),
+	};
+	ctui_form f;
+	ctui_form_init(&f, fields, 3);
+	CHECK(ctui_form_rows(&f) == 5);
+
+	ctui_rect label, control;
+	CHECK(ctui_form_slot(&f, 0, 40, &label, &control));
+	CHECK(label.y == 0 && label.x == 0 && label.width == 7);
+	CHECK(control.x == 9 && control.width == 31 && control.height == 1);
+	CHECK(ctui_form_slot(&f, 2, 40, &label, &control));
+	CHECK(label.y == 2 && control.height == 3);
+	CHECK(!ctui_form_slot(&f, 3, 40, &label, &control));
+	CHECK(!ctui_form_slot(&f, 0, 12, &label, &control)); /* too narrow */
+}
+
+static void test_click_check_and_focus(void)
+{
+	char a[4] = "";
+	ctui_field fields[] = {
+	    ctui_field_text("Name", a, 4),
+	    ctui_field_check("Enabled", "on", false),
+	};
+	ctui_form f;
+	ctui_form_init(&f, fields, 2);
+	CHECK(ctui_form_click(&f, 40, 10, 1, 0) ==
+	      CTUI_FORM_MOVED); /* on the label */
+	CHECK(f.focus == 1 && !fields[1].checked);
+	CHECK(ctui_form_click(&f, 40, 10, 1, 12) == CTUI_FORM_CHANGED);
+	CHECK(fields[1].checked);
+	CHECK(ctui_form_click(&f, 40, 10, 5, 12) ==
+	      CTUI_FORM_NONE); /* below the form */
+	CHECK(ctui_form_click(&f, 40, 10, 0, 12) == CTUI_FORM_MOVED &&
+	      f.focus == 0);
+}
+
+static void test_click_slider(void)
+{
+	ctui_field fields[] = {ctui_field_slider("Volume", 0, 100, 1, 0, 0)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 1);
+	/* control: x = 8, width 32, track = 24 columns */
+	CHECK(ctui_form_click(&f, 40, 10, 0, 8) ==
+	      CTUI_FORM_NONE); /* already 0 */
+	CHECK(ctui_form_click(&f, 40, 10, 0, 8 + 23) == CTUI_FORM_CHANGED);
+	CHECK_NEAR(fields[0].value, 100, 1e-9);
+	ctui_form_click(&f, 40, 10, 0, 8 + 23 / 2);
+	CHECK(fields[0].value > 40 && fields[0].value < 60);
+}
+
+static void test_click_list_and_select(void)
+{
+	ctui_field fields[] = {
+	    ctui_field_list("Colours", SHADES, NSHADES, 0, 3),
+	    ctui_field_select("Pick", SHADES, NSHADES, 0),
+	};
+	ctui_form f;
+	ctui_form_init(&f, fields, 2);
+	CHECK(ctui_form_click(&f, 40, 10, 2, 12) == CTUI_FORM_CHANGED);
+	CHECK(fields[0].choice == 2);
+
+	/* open the select, then click the third option of its dropdown */
+	CHECK(ctui_form_click(&f, 40, 10, 3, 12) == CTUI_FORM_MOVED);
+	CHECK(f.dropdown && f.focus == 1);
+	/* the dropdown is framed: border on row 4, options on rows 5..8 */
+	CHECK(ctui_form_click(&f, 40, 10, 4, 12) == CTUI_FORM_NONE &&
+	      f.dropdown);
+	CHECK(ctui_form_click(&f, 40, 10, 7, 12) == CTUI_FORM_CHANGED);
+	CHECK(!f.dropdown && fields[1].choice == 2);
+
+	/* a click elsewhere closes it */
+	ctui_form_click(&f, 40, 10, 3, 12);
+	CHECK(f.dropdown);
+	ctui_form_click(&f, 40, 10, 0, 0);
+	CHECK(!f.dropdown && f.focus == 0);
+}
+
+static void test_scroll_keeps_focus_visible(void)
+{
+	char buf[8][4] = {{0}};
+	ctui_field fields[8];
+	for (int i = 0; i < 8; i++)
+		fields[i] = ctui_field_text("Field", buf[i], 4);
+	ctui_form f;
+	ctui_form_init(&f, fields, 8);
+	for (int i = 0; i < 7; i++)
+		ctui_form_key(&f, KEY_DOWN);
+	/* 4 rows visible, focus on the last of 8: the form is scrolled by 4 */
+	CHECK(ctui_form_click(&f, 40, 4, 0, 12) == CTUI_FORM_MOVED);
+	CHECK(f.focus == 4);
+}
+
+int main(void)
+{
+	RUN(test_constructors);
+	RUN(test_init_skips_disabled);
+	RUN(test_text);
+	RUN(test_text_backspace_utf8);
+	RUN(test_check);
+	RUN(test_select_cycles);
+	RUN(test_select_dropdown);
+	RUN(test_slider);
+	RUN(test_slider_float_steps);
+	RUN(test_list);
+	RUN(test_focus_moves);
+	RUN(test_rows_and_slots);
+	RUN(test_click_check_and_focus);
+	RUN(test_click_slider);
+	RUN(test_click_list_and_select);
+	RUN(test_scroll_keeps_focus_visible);
+	return CHECK_DONE();
+}
