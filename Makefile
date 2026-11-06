@@ -13,6 +13,7 @@ SRCS    := $(sort $(wildcard src/*.c))
 OBJS    := $(SRCS:src/%.c=$(BUILD)/%.o)
 HEADERS := $(sort $(wildcard include/ctui/*.h))
 LIB     := $(BUILD)/libctui.a
+SOURCES := $(SRCS) $(HEADERS) $(wildcard tests/*.c)
 
 # Unit tests are linked with the library built with the sanitizers.
 # -fno-pie -no-pie: on linux-hardened a PIE lands inside the ASan shadow
@@ -25,7 +26,7 @@ SAN_LIB   := $(BUILD)/libctui-san.a
 TEST_SRCS := $(sort $(wildcard tests/test_*.c))
 TEST_BINS := $(TEST_SRCS:tests/%.c=$(BUILD)/tests/%)
 
-.PHONY: all test clean install
+.PHONY: all test format format-check lint clean install
 
 all: $(LIB)
 
@@ -51,6 +52,15 @@ $(SAN_LIB): $(SAN_OBJS)
 
 $(BUILD)/tests/%: tests/%.c $(wildcard tests/*.h) $(SAN_LIB) $(HEADERS) | $(BUILD)
 	$(CC) $(CFLAGS) $(SAN_FLAGS) $(LDFLAGS) -no-pie -o $@ $< $(SAN_LIB)
+
+format:
+	clang-format -i $(SOURCES)
+
+format-check:
+	clang-format --dry-run -Werror $(SOURCES)
+
+lint:
+	clang-tidy --quiet $(filter %.c,$(SOURCES)) -- -std=c11 -Iinclude
 
 install: all
 	install -Dm644 $(LIB) $(DESTDIR)$(LIBDIR)/libctui.a
