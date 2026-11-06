@@ -241,6 +241,9 @@ are ignored, and `ctui_labels_load()` reads a single file.
 - **bigtext**: large text in a 3 x 5 block font (digits, letters, space and
   `: . - /`; lowercase is drawn as uppercase, any other character blank), with
   `ctui_bigtext_width()` to measure, clipping to a column budget and a colour pair.
+- **helpview**: key-binding help overlay: caller-owned groups of (keys,
+  description) in a scrollable dialog that uses two columns on wide terminals
+  and one on narrow ones, with keys and wheel to scroll and close.
 
 ## Tests
 
