@@ -307,6 +307,11 @@ are ignored, and `ctui_labels_load()` reads a single file.
   value converts to and from the day count of `calendar.h`
   (`ctui_dateinput_days()`); `ctui_dateinput_parse()`, `ctui_dateinput_format()`
   and `ctui_dateinput_valid()` are pure; `style` overrides its colours.
+- **geo**: Web Mercator maths and a map viewport: longitude / latitude to
+  world and tile coordinates, a centre with a fractional zoom limited to a
+  range, pan that wraps over the antimeridian and stops at the poles, zoom
+  around a point, and the XYZ tiles that cover an area, nearest the centre
+  first, with the column wrapped (all pure functions on pixel sizes).
 
 ## Tests
 
