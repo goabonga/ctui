@@ -18,6 +18,7 @@
 #include <ctui/tabbar.h>
 #include <ctui/text.h>
 #include <ctui/theme.h>
+#include <ctui/toast.h>
 
 #define CTUI_VERSION "0.0.0"
 
