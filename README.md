@@ -62,6 +62,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   sanitising, word wrapping and clipped drawing helpers.
 - **gauge**: zoned bars and labelled `CPU [████░░░░] 12.0%` gauges coloured
   by value.
+- **frame**: rounded frames with an optional close button, separators and summary cards with labelled
+  gauges that adapt to their height.
 
 ## Tests
 
