@@ -13,6 +13,7 @@
 #include <ctui/form.h>
 #include <ctui/frame.h>
 #include <ctui/gauge.h>
+#include <ctui/heatmap.h>
 #include <ctui/helpview.h>
 #include <ctui/hexview.h>
 #include <ctui/histogram.h>
