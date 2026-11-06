@@ -93,6 +93,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   nested submenus (linked with a table of `ctui_menu_link`, marked by an arrow
   glyph with an ASCII fallback) on the right or, when short of room, on the
   left; Right/Enter open and Left/Esc close, and clicks and hover follow.
+- **tree**: lazily loaded file tree with sorting, keyboard navigation and
+  file-type icons (Nerd Font glyphs with an ASCII fallback).
 
 ## Tests
 
