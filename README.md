@@ -84,6 +84,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   dB / linear conversions; the level is set with keys, the mouse or the wheel.
 - **dialog**: non-blocking confirm, prompt and text viewer dialogs driven by
   plain state structs, and a helper centring a dialog of any size.
+- **list**: selectable lists with details, scrolling and mouse hit testing,
+  and popup menus with separators and disabled entries.
 
 ## Tests
 
