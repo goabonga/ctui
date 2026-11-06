@@ -277,6 +277,11 @@ are ignored, and `ctui_labels_load()` reads a single file.
   with density characters instead without colours or UTF-8, optional row and
   column labels, a min / max legend, NaN cells left empty, a cursor moved with
   the arrow keys, and cell lookup (row, column, value) for the mouse.
+- **treemap**: squarified treemap of weighted items in the colours of the
+  icon palette, labels and weights clipped to their rectangle, and a pure,
+  deterministic layout function (`ctui_treemap_squarify()`) that ignores zero,
+  negative, NaN and infinite weights and tiles the area exactly, plus cell
+  lookup for the mouse.
 
 ## Tests
 
