@@ -4,6 +4,7 @@
 #ifndef CTUI_H
 #define CTUI_H
 
+#include <ctui/bigtext.h>
 #include <ctui/burger.h>
 #include <ctui/dialog.h>
 #include <ctui/durationinput.h>
