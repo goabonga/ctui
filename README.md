@@ -315,6 +315,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
 - **mvt**: decoder for Mapbox Vector Tiles (protobuf, no library): layers, key
   and value tables, features with their tags and geometry decoded to points
   and parts; corrupt or truncated tiles are refused, never read past the end.
+- **tilecache**: bounded LRU cache of decoded tiles, limited in number and in
+  bytes.
 
 ## Tests
 
