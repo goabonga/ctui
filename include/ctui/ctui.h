@@ -6,6 +6,7 @@
 
 #include <ctui/bigtext.h>
 #include <ctui/burger.h>
+#include <ctui/canvas.h>
 #include <ctui/dialog.h>
 #include <ctui/durationinput.h>
 #include <ctui/form.h>
