@@ -20,6 +20,7 @@
 #include <ctui/knob.h>
 #include <ctui/labels.h>
 #include <ctui/layout.h>
+#include <ctui/linechart.h>
 #include <ctui/list.h>
 #include <ctui/logview.h>
 #include <ctui/meter.h>
