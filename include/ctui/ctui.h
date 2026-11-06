@@ -8,6 +8,7 @@
 #include <ctui/gauge.h>
 #include <ctui/labels.h>
 #include <ctui/scrollbar.h>
+#include <ctui/statusbar.h>
 #include <ctui/tabbar.h>
 #include <ctui/text.h>
 #include <ctui/theme.h>
