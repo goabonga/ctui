@@ -31,15 +31,33 @@ ctui_theme_set_palette(&colors);       /* NULL restores the default */
 ctui_glyphs glyphs = *ctui_theme_glyphs_for(true);
 glyphs.scroll_thumb = "#";
 ctui_theme_set_glyphs(&glyphs, NULL);  /* Unicode set, ASCII set */
+
+ctui_labels words = {.yes = "Oui", .no = "Non"};
+ctui_labels_set(&words);               /* unset fields keep the English text */
 ```
 
 Glyphs fall back to ASCII when the locale is not UTF-8 or when `CTUI_ASCII`
 is set; `NO_COLOR` disables colours.
 
+The texts can also come from language files, one per language, read for the
+locale of the machine (`LC_ALL`, `LC_MESSAGES` or `LANG`); the built-in
+English stays when the locale is `C` or no file exists:
+
+```c
+ctui_labels_load_locale("/usr/share/myapp/lang");  /* fr_FR.UTF-8: fr_FR.lang, then fr.lang */
+```
+
+A language file holds lines `field = text`, where `field` is a member name
+of `ctui_labels`; blank lines, lines starting with `#` and unknown fields
+are ignored, and `ctui_labels_load()` reads a single file.
+
 ## Components
 
 - **theme**: Solarized powerline palette, colour pairs, tones, glyph sets
   with ASCII and monochrome fallbacks.
+- **labels**: the texts the components draw themselves (buttons, titles, key
+  hints), replaceable as a set or per component, and loadable from language
+  files.
 
 ## Tests
 
