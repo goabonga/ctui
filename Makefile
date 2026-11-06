@@ -55,7 +55,7 @@ $(SAN_LIB): $(SAN_OBJS)
 	$(AR) rcs $@ $^
 
 $(BUILD)/tests/%: tests/%.c $(wildcard tests/*.h) $(SAN_LIB) $(HEADERS) | $(BUILD)
-	$(CC) $(CFLAGS) $(SAN_FLAGS) $(LDFLAGS) -no-pie -o $@ $< $(SAN_LIB) $(NCURSES_LIBS)
+	$(CC) $(CFLAGS) $(SAN_FLAGS) $(LDFLAGS) -no-pie -o $@ $< $(SAN_LIB) $(NCURSES_LIBS) -lm
 
 # Every public header must compile alone, and twice (include guards).
 check-headers: | $(BUILD)
