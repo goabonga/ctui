@@ -42,6 +42,7 @@
 #include <ctui/timeinput.h>
 #include <ctui/toast.h>
 #include <ctui/tree.h>
+#include <ctui/waveform.h>
 #include <ctui/wizard.h>
 
 #define CTUI_VERSION "0.0.0"
