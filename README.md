@@ -58,6 +58,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
 - **labels**: the texts the components draw themselves (buttons, titles, key
   hints), replaceable as a set or per component, and loadable from language
   files.
+- **text**: locale-independent UTF-8 decoding and column arithmetic,
+  sanitising, word wrapping and clipped drawing helpers.
 
 ## Tests
 
