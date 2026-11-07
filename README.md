@@ -80,7 +80,9 @@ are ignored, and `ctui_labels_load()` reads a single file.
 - **frame**: rounded frames with an optional close button, separators and summary cards with labelled
   gauges that adapt to their height.
 - **scrollbar**: vertical or horizontal scrollbar with a proportional thumb,
-  grabbing and dragging, page jumps on the track and mouse wheel support.
+  grabbing and dragging, page jumps on the track and mouse wheel support. A
+  horizontal thumb is a lower half block so that it is as thick as a vertical
+  one.
 - **tabbar**: powerline tab bar with icons, disabled and closable tabs,
   right-aligned hints and a pure layout shared with mouse hit testing.
 - **statusbar**: powerline status bar with left and right runs of toned
