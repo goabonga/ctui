@@ -27,6 +27,14 @@
  * The viewport wraps around the antimeridian, stops at the poles, and
  * follows the size of the area, so a resize needs nothing.
  *
+ * Markers are places given by the caller, drawn as discs of dots on the
+ * canvas like the points of a scatter plot (see linechart.h), or as an icon
+ * of the caller's choice, any text. Tab and Shift-Tab
+ * move the selection from one marker to the next, Enter shows the info bubble
+ * of the selected marker (its title and its text) and Escape hides it; a click
+ * on a marker selects it and shows its bubble, a click elsewhere hides the
+ * bubble.
+ *
  * Coordinates of the event functions are relative to the top-left cell of
  * the area the map is drawn in, which is width x height cells; the map is
  * 2 * width by 4 * height dots.
@@ -71,6 +79,20 @@ typedef enum ctui_map_category {
 typedef bool (*ctui_map_tile_fn)(void *ctx, int z, int x, int y,
 				 const uint8_t **data, size_t *len);
 
+/* A place on the map, drawn as a disc of dots or as an icon of your choice
+ * (a star, a pin, a letter...), in marker_color, or marker_selected_color
+ * when selected. The strings belong to the caller and must outlive the
+ * map or the next ctui_map_set_markers(). */
+typedef struct ctui_map_marker {
+	double lon, lat;
+	const char *title; /* top edge of the bubble, may be NULL */
+	const char *text;  /* lines of the bubble, separated by '\n', may be
+			      NULL */
+	const char *icon;  /* drawn instead of the disc of dots (any text, one
+			      or a few columns), NULL for the disc */
+	const char *ascii_icon; /* the same without UTF-8; "*" when NULL */
+} ctui_map_marker;
+
 typedef struct ctui_map {
 	ctui_geo_view view; /* kept inside the zoom limits at every call */
 	bool visible[CTUI_MAP_CATEGORY_COUNT];
@@ -86,9 +108,17 @@ typedef struct ctui_map {
 	const ctui_style *
 	    style; /* colours of the attribution, may be NULL; set after init */
 	size_t missing; /* tiles wanted but not available at the last draw */
+	const ctui_map_marker *markers; /* see ctui_map_set_markers() */
+	size_t marker_count;
+	ctui_icon_color marker_color;	       /* yellow */
+	ctui_icon_color marker_selected_color; /* orange, drawn larger */
+	int marker;  /* the selected marker, -1 for none */
+	bool bubble; /* the bubble of the selected marker is shown */
 	/* private */
 	bool placed;
 	bool dragging;
+	bool drag_moved;
+	int press_marker; /* marker under the press, -1 for none */
 	int drag_y, drag_x;
 	ctui_canvas canvas;
 	ctui_tilecache cache;
@@ -96,10 +126,12 @@ typedef struct ctui_map {
 
 typedef enum ctui_map_event {
 	CTUI_MAP_NONE = 0,
-	CTUI_MAP_MOVED,	  /* the centre changed */
-	CTUI_MAP_ZOOMED,  /* the zoom changed */
-	CTUI_MAP_TOGGLED, /* a category was shown or hidden */
-	CTUI_MAP_RESET	  /* back to the whole world */
+	CTUI_MAP_MOVED,	   /* the centre changed */
+	CTUI_MAP_ZOOMED,   /* the zoom changed */
+	CTUI_MAP_TOGGLED,  /* a category was shown or hidden */
+	CTUI_MAP_RESET,	   /* back to the whole world */
+	CTUI_MAP_SELECTED, /* another marker is selected, or none */
+	CTUI_MAP_BUBBLE	   /* the bubble was shown or hidden */
 } ctui_map_event;
 
 /* The whole world, default categories and colours. The area size is only
@@ -135,8 +167,10 @@ ctui_map_event ctui_map_pan(ctui_map *map, int width, int height, double dx,
 ctui_map_event ctui_map_zoom(ctui_map *map, int width, int height, int steps,
 			     int y, int x);
 
-/* Arrows / h j k l pan, + = - _ zoom, Home and 0 show the world again, and
- * the key of a category toggles it (see ctui_map_category_for_key()). */
+/* Arrows / h j k l pan, + = - _ zoom, Home and 0 show the world again, Tab
+ * and Shift-Tab select the next and the previous marker, Enter shows or
+ * hides its bubble, Escape hides it, and the key of a category toggles it
+ * (see ctui_map_category_for_key()). */
 ctui_map_event ctui_map_key(ctui_map *map, int key, int width, int height);
 
 /* The category toggled by a key (w water, d roads, r rails, f ferries,
@@ -157,6 +191,28 @@ const char *ctui_map_category_name(ctui_map_category category);
 ctui_icon_color ctui_map_color(const ctui_map *map, ctui_map_category category,
 			       const char *klass);
 
+/* Show `count` markers (the array is not copied; NULL or 0 for none). The
+ * selection is cleared and the bubble hidden. */
+void ctui_map_set_markers(ctui_map *map, const ctui_map_marker *markers,
+			  size_t count);
+
+/* Select marker `index` (-1 for none), bring it into view when it is outside
+ * and hide the bubble. CTUI_MAP_SELECTED when the selection changed. */
+ctui_map_event ctui_map_select(ctui_map *map, int width, int height, int index);
+
+/* Select the next marker (`step` > 0) or the previous one, wrapping round;
+ * the first (or the last) when none is selected. */
+ctui_map_event ctui_map_select_step(ctui_map *map, int width, int height,
+				    int step);
+
+/* Show or hide the bubble of the selected marker; it does nothing without a
+ * selection. CTUI_MAP_BUBBLE when it changed. */
+ctui_map_event ctui_map_set_bubble(ctui_map *map, bool shown);
+
+/* The marker whose disc touches cell (y, x), or -1 (the selected one wins
+ * when discs overlap). */
+int ctui_map_marker_at(ctui_map *map, int width, int height, int y, int x);
+
 /* True when the cell (y, x) is inside a width x height map. */
 bool ctui_map_hit(int width, int height, int y, int x);
 
@@ -164,11 +220,14 @@ bool ctui_map_hit(int width, int height, int y, int x);
 bool ctui_map_lonlat_at(ctui_map *map, int width, int height, int y, int x,
 			double *lon, double *lat);
 
-/* Left press inside the area starts a drag. */
+/* Left press inside the area starts a drag. A press that is released
+ * without moving is a click: on a marker it selects it and shows its bubble,
+ * elsewhere it hides the bubble. */
 bool ctui_map_press(ctui_map *map, int width, int height, int y, int x);
 
 /* Pointer moved (the point may be outside the area) / released after a
- * press: the map follows the pointer; a drag that ended. */
+ * press: the map follows the pointer; true when a press ended (the markers
+ * and the bubble may have changed, see map->marker and map->bubble). */
 ctui_map_event ctui_map_drag(ctui_map *map, int width, int height, int y,
 			     int x);
 bool ctui_map_release(ctui_map *map);
