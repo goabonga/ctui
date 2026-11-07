@@ -6,6 +6,7 @@
 
 #include <ctui/burger.h>
 #include <ctui/dialog.h>
+#include <ctui/durationinput.h>
 #include <ctui/frame.h>
 #include <ctui/gauge.h>
 #include <ctui/input.h>
