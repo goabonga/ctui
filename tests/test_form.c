@@ -7,6 +7,7 @@
 #include <curses.h>
 
 #include "check.h"
+#include "screen.h"
 #include <ctui/form.h>
 
 static const char *const SHADES[] = {"red", "green", "blue", "cyan"};
@@ -316,6 +317,227 @@ static void test_scroll_keeps_focus_visible(void)
 	CHECK(f.focus == 4);
 }
 
+#define H 3600000000LL
+#define M 60000000LL
+#define S 1000000LL
+
+static void keys(ctui_form *f, const char *text)
+{
+	for (; *text; text++)
+		ctui_form_key(f, *text);
+}
+
+static void test_input_constructors(void)
+{
+	ctui_field d = ctui_field_date("Birth", 2024, 2, 29);
+	CHECK(d.kind == CTUI_FIELD_DATE && d.date.year == 2024 &&
+	      d.date.month == 2 && d.date.day == 29);
+	ctui_field bad = ctui_field_date("Birth", 2023, 2, 29);
+	CHECK(bad.date.year == 1970 && bad.date.day == 1);
+	ctui_field t =
+	    ctui_field_time("Start", CTUI_TIME_SECONDS, 9 * H + 30 * M);
+	CHECK(t.kind == CTUI_FIELD_TIME && t.time.micro == 9 * H + 30 * M &&
+	      t.time.precision == CTUI_TIME_SECONDS);
+	ctui_field l = ctui_field_duration("Length", CTUI_DURATION_HOURS,
+					   CTUI_DURATION_SECONDS, 90 * M);
+	CHECK(l.kind == CTUI_FIELD_DURATION && l.duration.micro == 90 * M &&
+	      l.duration.largest == CTUI_DURATION_HOURS);
+	CHECK(l.label != NULL && !l.disabled);
+}
+
+static void test_date_field(void)
+{
+	ctui_field fields[] = {ctui_field_date("Birth", 2024, 2, 28),
+			       ctui_field_check("Done", "yes", false)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 2);
+	CHECK(ctui_form_editing(&f));
+	/* the segment moves, PgUp / PgDn step it, Up / Down leave the field */
+	CHECK(ctui_form_key(&f, KEY_RIGHT) == CTUI_FORM_MOVED);
+	CHECK(ctui_form_key(&f, KEY_PPAGE) == CTUI_FORM_CHANGED);
+	CHECK(fields[0].date.month == 3 && fields[0].date.day == 28);
+	CHECK(ctui_form_key(&f, KEY_NPAGE) == CTUI_FORM_CHANGED);
+	CHECK(fields[0].date.month == 2);
+	CHECK(ctui_form_key(&f, '-') == CTUI_FORM_MOVED &&
+	      fields[0].date.segment == CTUI_DATEINPUT_DAY);
+	/* '+' and '-' are not steps in a date */
+	CHECK(ctui_form_key(&f, '+') == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, KEY_LEFT) == CTUI_FORM_MOVED);
+	/* typing */
+	keys(&f, "07");
+	CHECK(fields[0].date.month == 7);
+	/* Enter opens the picker, which owns the keys until it closes */
+	CHECK(ctui_form_key(&f, '\n') == CTUI_FORM_MOVED &&
+	      fields[0].date.open);
+	CHECK(ctui_form_editing(&f));
+	CHECK(ctui_form_key(&f, KEY_RIGHT) == CTUI_FORM_MOVED);
+	CHECK(ctui_form_key(&f, KEY_DOWN) == CTUI_FORM_MOVED); /* a week on */
+	CHECK(f.focus == 0);
+	CHECK(ctui_form_key(&f, '\n') == CTUI_FORM_CHANGED &&
+	      !fields[0].date.open);
+	/* the cursor went a day on, then a week: 28 + 1 + 7 days of July */
+	CHECK(fields[0].date.month == 8 && fields[0].date.day == 5);
+	/* Esc closes the picker without cancelling the form, then cancels it */
+	ctui_form_key(&f, '\n');
+	CHECK(ctui_form_key(&f, 27) == CTUI_FORM_MOVED && !fields[0].date.open);
+	CHECK(ctui_form_key(&f, 27) == CTUI_FORM_CANCELLED);
+	/* Up / Down and Tab move between the fields */
+	CHECK(ctui_form_key(&f, KEY_DOWN) == CTUI_FORM_MOVED && f.focus == 1);
+	CHECK(ctui_form_key(&f, KEY_UP) == CTUI_FORM_MOVED && f.focus == 0);
+	CHECK(ctui_form_key(&f, KEY_DOWN) == CTUI_FORM_MOVED && f.focus == 1);
+	CHECK(!ctui_form_editing(&f));
+}
+
+static void test_time_field(void)
+{
+	ctui_field fields[] = {ctui_field_time("Start", CTUI_TIME_SECONDS, 0)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 1);
+	CHECK(ctui_form_editing(&f));
+	CHECK(ctui_form_key(&f, '0') == CTUI_FORM_MOVED); /* 0 stays 0 */
+	CHECK(ctui_form_key(&f, '9') == CTUI_FORM_CHANGED);
+	CHECK(fields[0].time.micro == 9 * H &&
+	      fields[0].time.segment == CTUI_TIMEINPUT_MINUTE);
+	keys(&f, "30");
+	CHECK(fields[0].time.micro == 9 * H + 30 * M);
+	CHECK(ctui_form_key(&f, '+') == CTUI_FORM_CHANGED &&
+	      fields[0].time.micro == 9 * H + 30 * M + S);
+	CHECK(ctui_form_key(&f, KEY_PPAGE) == CTUI_FORM_CHANGED &&
+	      fields[0].time.micro == 9 * H + 30 * M + 2 * S);
+	CHECK(ctui_form_key(&f, '-') == CTUI_FORM_CHANGED);
+	CHECK(ctui_form_key(&f, KEY_NPAGE) == CTUI_FORM_CHANGED &&
+	      fields[0].time.micro == 9 * H + 30 * M);
+	/* the limits of the time are kept */
+	long long hi = 9 * H + 30 * M;
+	ctui_timeinput_set_limits(&fields[0].time, NULL, &hi);
+	CHECK(ctui_form_key(&f, '+') == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, '\n') == CTUI_FORM_SUBMITTED);
+	CHECK(ctui_form_key(&f, 'x') == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, 27) == CTUI_FORM_CANCELLED);
+}
+
+static void test_duration_field(void)
+{
+	ctui_field fields[] = {ctui_field_duration(
+	    "Length", CTUI_DURATION_HOURS, CTUI_DURATION_SECONDS, 0)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 1);
+	CHECK(ctui_form_editing(&f));
+	keys(&f, "012");
+	CHECK(fields[0].duration.micro == 12 * H &&
+	      fields[0].duration.segment == CTUI_DURATION_MINUTES);
+	CHECK(ctui_form_key(&f, '5') == CTUI_FORM_CHANGED);
+	CHECK(ctui_form_key(&f, KEY_RIGHT) == CTUI_FORM_MOVED);
+	CHECK(ctui_form_key(&f, '+') == CTUI_FORM_CHANGED &&
+	      fields[0].duration.micro == 12 * H + 5 * M + S);
+	CHECK(ctui_form_key(&f, KEY_NPAGE) == CTUI_FORM_CHANGED &&
+	      fields[0].duration.micro == 12 * H + 5 * M);
+	long long max = 12 * H + 5 * M;
+	ctui_durationinput_set_max(&fields[0].duration, &max);
+	CHECK(ctui_form_key(&f, KEY_PPAGE) == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, '\n') == CTUI_FORM_SUBMITTED);
+	CHECK(ctui_form_key(&f, 27) == CTUI_FORM_CANCELLED);
+	/* a disabled input is skipped */
+	ctui_field two[] = {ctui_field_time("A", CTUI_TIME_MINUTES, 0),
+			    ctui_field_duration("B", CTUI_DURATION_HOURS,
+						CTUI_DURATION_MINUTES, 0)};
+	two[0].disabled = true;
+	ctui_form_init(&f, two, 2);
+	CHECK(f.focus == 1);
+}
+
+static void test_input_clicks(void)
+{
+	ctui_field fields[] = {
+	    ctui_field_date("Birth", 2024, 2, 28),
+	    ctui_field_time("Start", CTUI_TIME_SECONDS, 0),
+	    ctui_field_duration("Length", CTUI_DURATION_HOURS,
+				CTUI_DURATION_SECONDS, 0),
+	};
+	ctui_form f;
+	ctui_form_init(&f, fields, 3);
+	/* control: x = 8; the date's segments start at column 1 of the field */
+	CHECK(ctui_form_click(&f, 60, 12, 0, 8 + 6) == CTUI_FORM_MOVED &&
+	      fields[0].date.segment == CTUI_DATEINPUT_MONTH);
+	CHECK(ctui_form_click(&f, 60, 12, 0, 8 + 6) == CTUI_FORM_NONE);
+	/* the time: focus moves, then the segment */
+	CHECK(ctui_form_click(&f, 60, 12, 1, 8 + 7) == CTUI_FORM_MOVED);
+	CHECK(f.focus == 1 && fields[1].time.segment == CTUI_TIMEINPUT_SECOND);
+	CHECK(ctui_form_click(&f, 60, 12, 1, 8 + 4) == CTUI_FORM_MOVED &&
+	      fields[1].time.segment == CTUI_TIMEINPUT_MINUTE);
+	CHECK(ctui_form_click(&f, 60, 12, 2, 8 + 10) == CTUI_FORM_MOVED);
+	CHECK(f.focus == 2 &&
+	      fields[2].duration.segment == CTUI_DURATION_SECONDS);
+	CHECK(ctui_form_click(&f, 60, 12, 2, 8 + 6) == CTUI_FORM_MOVED &&
+	      fields[2].duration.segment == CTUI_DURATION_MINUTES);
+	/* on the label only the focus moves */
+	CHECK(ctui_form_click(&f, 60, 12, 0, 0) == CTUI_FORM_MOVED &&
+	      f.focus == 0);
+	/* the arrow opens the date picker; its days are picked by a click */
+	CHECK(ctui_form_click(&f, 60, 12, 0, 8 + 12) == CTUI_FORM_MOVED &&
+	      fields[0].date.open);
+	int row = 0, col = 0;
+	ctui_calendar picker = fields[0].date.picker;
+	/* the calendar sits in a frame, one row and one column in */
+	for (int r = 0; r < ctui_calendar_height() && !row; r++)
+		for (int c = 0; c < ctui_calendar_width() && !row; c++) {
+			int day = 0;
+			if (ctui_calendar_hit(&picker, r, c, &day) ==
+				CTUI_CALENDAR_DAY &&
+			    day == 10) {
+				row = r + 2;
+				col = c + 1;
+			}
+		}
+	CHECK(row > 0);
+	CHECK(ctui_form_click(&f, 60, 12, row, 8 + col) == CTUI_FORM_CHANGED);
+	CHECK(!fields[0].date.open && fields[0].date.day == 10);
+	/* a click elsewhere closes the picker and goes on to what it hit */
+	ctui_form_click(&f, 60, 12, 0, 8 + 12);
+	CHECK(fields[0].date.open);
+	CHECK(ctui_form_click(&f, 60, 12, 1, 0) == CTUI_FORM_MOVED);
+	CHECK(!fields[0].date.open && f.focus == 1);
+}
+
+static void test_input_draw(void)
+{
+	screen_open(24, 80);
+	ctui_field fields[] = {
+	    ctui_field_date("Birth", 2024, 2, 28),
+	    ctui_field_time("Start", CTUI_TIME_MILLIS,
+			    9 * H + 5 * M + 7 * S + 123000),
+	    ctui_field_duration("Length", CTUI_DURATION_HOURS,
+				CTUI_DURATION_SECONDS, 90 * M),
+	};
+	ctui_form f;
+	ctui_form_init(&f, fields, 3);
+	screen_clear();
+	ctui_form_draw(&f, 0, 0, 60, 12);
+	CHECK(screen_has_text("2024-02-28") &&
+	      screen_has_text("09:05:07.123") &&
+	      screen_has_text("001h 30m 00s"));
+	/* a narrow control shows the text cut to it */
+	screen_clear();
+	ctui_form_draw(&f, 0, 0, 20, 12);
+	CHECK(screen_has_text("2024-02-2") || screen_has_text("2024-02-"));
+	/* an open picker hangs under its field */
+	fields[0].date.picker.year = 2024;
+	ctui_form_key(&f, '\n');
+	CHECK(fields[0].date.open);
+	screen_clear();
+	ctui_form_draw(&f, 0, 0, 60, 12);
+	CHECK(screen_has_text("February 2024") &&
+	      screen_has_text("M  T  W  T  F  S  S"));
+	/* a disabled input shows a dash and the blurred form no focus */
+	fields[1].disabled = true;
+	fields[0].date.open = false;
+	f.blurred = true;
+	screen_clear();
+	ctui_form_draw(&f, 0, 0, 60, 12);
+	CHECK(!screen_has_text("09:05:07.123"));
+	endwin();
+}
+
 int main(void)
 {
 	RUN(test_constructors);
@@ -334,5 +556,11 @@ int main(void)
 	RUN(test_click_slider);
 	RUN(test_click_list_and_select);
 	RUN(test_scroll_keeps_focus_visible);
+	RUN(test_input_constructors);
+	RUN(test_date_field);
+	RUN(test_time_field);
+	RUN(test_duration_field);
+	RUN(test_input_clicks);
+	RUN(test_input_draw);
 	return CHECK_DONE();
 }
