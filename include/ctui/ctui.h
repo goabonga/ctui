@@ -27,6 +27,7 @@
 #include <ctui/tabpanel.h>
 #include <ctui/text.h>
 #include <ctui/theme.h>
+#include <ctui/timeinput.h>
 #include <ctui/toast.h>
 #include <ctui/tree.h>
 #include <ctui/wizard.h>
