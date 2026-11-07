@@ -149,6 +149,53 @@ static void test_dialog_time_fields(void)
 	CHECK(d.error == CTUI_CAL_EVENT_END_BEFORE);
 }
 
+static void test_dialog_ways(void)
+{
+	static const char *const WAYS[] = {"On each day", "Weekly",
+					   "One event"};
+	ctui_cal_event_dialog d;
+	ctui_cal_event_dialog_layout l, l3;
+	screen_open(24, 80);
+	ctui_cal_event_dialog_init(&d, "Review", 600, 660, false);
+	CHECK(d.form.count == 4 && ctui_cal_event_dialog_way(&d) == 0);
+	CHECK(ctui_cal_event_dialog_layout_for(&d, LINES, COLS, &l));
+	/* no ways, or a single one: no field */
+	ctui_cal_event_dialog_set_ways(&d, WAYS, 1);
+	CHECK(d.form.count == 4 && d.way_count == 0);
+	ctui_cal_event_dialog_set_ways(&d, NULL, 3);
+	CHECK(d.form.count == 4);
+	/* three ways: a select under the times, and a box one row taller */
+	ctui_cal_event_dialog_set_ways(&d, WAYS, 3);
+	CHECK(d.form.count == 5 && d.way_count == 3 &&
+	      d.fields[4].kind == CTUI_FIELD_SELECT);
+	CHECK(ctui_cal_event_dialog_layout_for(&d, LINES, COLS, &l3));
+	CHECK(l3.box.height == l.box.height + 1 &&
+	      l3.form.height == l.form.height + 1);
+	screen_clear();
+	ctui_cal_event_dialog_draw(&d);
+	CHECK(screen_has_text("Days") && screen_has_text("On each day"));
+	/* the first way is chosen; Right on the field picks the next */
+	CHECK(ctui_cal_event_dialog_way(&d) == 0);
+	for (int i = 0; i < 4; i++)
+		ctui_cal_event_dialog_key(&d, KEY_DOWN);
+	CHECK(d.form.focus == 4);
+	ctui_cal_event_dialog_key(&d, KEY_RIGHT);
+	CHECK(ctui_cal_event_dialog_way(&d) == 1);
+	ctui_cal_event_dialog_key(&d, KEY_RIGHT);
+	ctui_cal_event_dialog_key(&d, KEY_RIGHT); /* stays on the last one */
+	CHECK(ctui_cal_event_dialog_way(&d) == 2);
+	ctui_cal_event_dialog_key(&d, KEY_LEFT);
+	CHECK(ctui_cal_event_dialog_way(&d) == 1);
+	/* the times are still the ones of the dialog */
+	int s = -1, e = -1;
+	CHECK(ctui_cal_event_dialog_result(&d, &s, &e) == CTUI_CAL_EVENT_OK &&
+	      s == 600 && e == 660);
+	/* hiding the field again */
+	ctui_cal_event_dialog_set_ways(&d, NULL, 0);
+	CHECK(d.form.count == 4 && ctui_cal_event_dialog_way(&d) == 0);
+	endwin();
+}
+
 static void test_layout_click_draw(void)
 {
 	ctui_cal_event_dialog d;
@@ -201,6 +248,7 @@ int main(void)
 	RUN(test_check);
 	RUN(test_dialog_keys);
 	RUN(test_dialog_time_fields);
+	RUN(test_dialog_ways);
 	RUN(test_layout_click_draw);
 	return CHECK_DONE();
 }
