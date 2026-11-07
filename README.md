@@ -334,7 +334,14 @@ are ignored, and `ctui_labels_load()` reads a single file.
   the theme; when the pairs run out the colours are reduced step by step, and
   without colours the image is drawn by brightness. Box or nearest scaling,
   aspect-preserving fit (cells count as 1:2) or stretch, zoom and pan, alpha
-  blended onto a background colour. Scaling, quantising and the layout are
+  blended onto a background colour. On terminals that draw pixels (Kitty
+  graphics protocol: kitty, WezTerm, ghostty; Sixel: foot, mlterm, contour,
+  iTerm2) `CTUI_IMAGE_PIXELS` shows the real pixels: the picture is resampled
+  to the pixels of its cells, sent once after `refresh()` by
+  `ctui_image_flush()` and taken off when it is no longer drawn; elsewhere it
+  is half blocks. The terminal is found from the environment
+  (`CTUI_IMAGE_PROTOCOL=kitty|sixel|none` overrides it, tmux and screen get
+  nothing). Scaling, quantising and the layout are
   pure functions; a small reader loads binary PPM (P6) and PAM files (bounds
   checked, size capped, malformed files refused). PNG and JPEG are not read.
 
