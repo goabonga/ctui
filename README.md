@@ -143,6 +143,15 @@ are ignored, and `ctui_labels_load()` reads a single file.
   Down and the wheel step it (wrapping without carry), PgUp / PgDn step by ten
   and a click selects a segment. `ctui_timeinput_parse()` and
   `ctui_timeinput_format()` are pure; `style` overrides its colours.
+- **durationinput**: duration field such as `012h 30m 05s 250ms 017us` edited
+  unit by unit, from hours down to microseconds (the largest and the smallest
+  unit shown are chosen), the value being a number of microseconds cut to the
+  smallest unit. The largest unit takes what the others do not, Up / Down and
+  the wheel step a unit and carry into the larger ones, and an optional
+  maximum is respected by typing and stepping and sizes the largest unit.
+  `ctui_durationinput_parse()` reads `1h 30m 5s 250ms 10us` and
+  `ctui_durationinput_format()` writes the field text; both are pure and
+  `style` overrides the colours.
 
 ## Tests
 
