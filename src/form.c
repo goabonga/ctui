@@ -86,6 +86,35 @@ ctui_field ctui_field_list(const char *label, const char *const *options,
 	return f;
 }
 
+ctui_field ctui_field_date(const char *label, int year, int month, int day)
+{
+	ctui_field f = {.kind = CTUI_FIELD_DATE, .label = label};
+	ctui_dateinput_init(&f.date, year, month, day);
+	return f;
+}
+
+ctui_field ctui_field_time(const char *label, ctui_time_precision precision,
+			   long long micro)
+{
+	ctui_field f = {.kind = CTUI_FIELD_TIME, .label = label};
+	ctui_timeinput_init(&f.time, precision, micro);
+	return f;
+}
+
+ctui_field ctui_field_duration(const char *label, ctui_duration_unit largest,
+			       ctui_duration_unit smallest, long long micro)
+{
+	ctui_field f = {.kind = CTUI_FIELD_DURATION, .label = label};
+	ctui_durationinput_init(&f.duration, largest, smallest, micro);
+	return f;
+}
+
+static bool is_input(const ctui_field *f)
+{
+	return f->kind == CTUI_FIELD_DATE || f->kind == CTUI_FIELD_TIME ||
+	       f->kind == CTUI_FIELD_DURATION;
+}
+
 static int field_rows(const ctui_field *f)
 {
 	return f->kind == CTUI_FIELD_LIST ? (f->rows < 1 ? 1 : f->rows) : 1;
@@ -117,7 +146,8 @@ bool ctui_form_editing(const ctui_form *f)
 {
 	if (f->count == 0)
 		return false;
-	return f->dropdown || f->fields[f->focus].kind == CTUI_FIELD_TEXT;
+	const ctui_field *fld = &f->fields[f->focus];
+	return f->dropdown || fld->kind == CTUI_FIELD_TEXT || is_input(fld);
 }
 
 int ctui_form_rows(const ctui_form *f)
@@ -325,6 +355,87 @@ static ctui_form_event slider_key(ctui_field *fld, int key)
 	}
 }
 
+static ctui_form_event date_event(ctui_dateinput_event e)
+{
+	switch (e) {
+	case CTUI_DATEINPUT_CHANGED:
+		return CTUI_FORM_CHANGED;
+	case CTUI_DATEINPUT_NONE:
+		return CTUI_FORM_NONE;
+	default:
+		return CTUI_FORM_MOVED;
+	}
+}
+
+static ctui_form_event time_event(ctui_timeinput_event e)
+{
+	switch (e) {
+	case CTUI_TIMEINPUT_CHANGED:
+		return CTUI_FORM_CHANGED;
+	case CTUI_TIMEINPUT_MOVED:
+		return CTUI_FORM_MOVED;
+	case CTUI_TIMEINPUT_SUBMITTED:
+		return CTUI_FORM_SUBMITTED;
+	case CTUI_TIMEINPUT_CANCELLED:
+		return CTUI_FORM_CANCELLED;
+	default:
+		return CTUI_FORM_NONE;
+	}
+}
+
+static ctui_form_event duration_event(ctui_durationinput_event e)
+{
+	switch (e) {
+	case CTUI_DURATIONINPUT_CHANGED:
+		return CTUI_FORM_CHANGED;
+	case CTUI_DURATIONINPUT_MOVED:
+		return CTUI_FORM_MOVED;
+	case CTUI_DURATIONINPUT_SUBMITTED:
+		return CTUI_FORM_SUBMITTED;
+	case CTUI_DURATIONINPUT_CANCELLED:
+		return CTUI_FORM_CANCELLED;
+	default:
+		return CTUI_FORM_NONE;
+	}
+}
+
+/* PgUp / PgDn step the value (Up / Down move between the fields), and + / -
+ * too except in a date, where '-' separates the segments. */
+static int step_of(int key, bool date)
+{
+	if (key == KEY_PPAGE || (!date && key == '+'))
+		return 1;
+	if (key == KEY_NPAGE || (!date && key == '-'))
+		return -1;
+	return 0;
+}
+
+static ctui_form_event input_key(ctui_field *fld, int key)
+{
+	int step = step_of(key, fld->kind == CTUI_FIELD_DATE);
+	if (fld->kind == CTUI_FIELD_DATE) {
+		if (step)
+			return ctui_dateinput_step(&fld->date, step)
+				   ? CTUI_FORM_CHANGED
+				   : CTUI_FORM_NONE;
+		if (key == KEY_UP || key == KEY_DOWN)
+			return CTUI_FORM_NONE;
+		return date_event(ctui_dateinput_key(&fld->date, key));
+	}
+	if (fld->kind == CTUI_FIELD_TIME) {
+		if (step)
+			return ctui_timeinput_step(&fld->time, step)
+				   ? CTUI_FORM_CHANGED
+				   : CTUI_FORM_NONE;
+		return time_event(ctui_timeinput_key(&fld->time, key));
+	}
+	if (step)
+		return ctui_durationinput_step(&fld->duration, step)
+			   ? CTUI_FORM_CHANGED
+			   : CTUI_FORM_NONE;
+	return duration_event(ctui_durationinput_key(&fld->duration, key));
+}
+
 ctui_form_event ctui_form_key(ctui_form *f, int key)
 {
 	if (f->count == 0)
@@ -332,6 +443,8 @@ ctui_form_event ctui_form_key(ctui_form *f, int key)
 	ctui_field *fld = &f->fields[f->focus];
 	if (f->dropdown)
 		return dropdown_key(f, fld, key);
+	if (fld->kind == CTUI_FIELD_DATE && fld->date.open)
+		return date_event(ctui_dateinput_key(&fld->date, key));
 	if (key == 27)
 		return CTUI_FORM_CANCELLED;
 	if (key == KEY_BTAB)
@@ -379,6 +492,10 @@ ctui_form_event ctui_form_key(ctui_form *f, int key)
 		if (key == '\n' || key == KEY_ENTER)
 			return CTUI_FORM_SUBMITTED;
 		return slider_key(fld, key);
+	case CTUI_FIELD_DATE:
+	case CTUI_FIELD_TIME:
+	case CTUI_FIELD_DURATION:
+		return input_key(fld, key);
 	default:
 		return CTUI_FORM_NONE;
 	}
@@ -439,6 +556,18 @@ ctui_form_event ctui_form_click(ctui_form *f, int width, int height, int y,
 		f->dropdown = false;
 	}
 	int scroll = scroll_of(f, height);
+	ctui_field *focused = &f->fields[f->focus];
+	if (focused->kind == CTUI_FIELD_DATE && focused->date.open) {
+		/* the picker hangs under the field: its clicks, or the one
+		 * that closes it */
+		ctui_rect label, control;
+		if (!ctui_form_slot(f, f->focus, width, &label, &control))
+			return CTUI_FORM_NONE;
+		ctui_dateinput_event e = ctui_dateinput_click(
+		    &focused->date, y - (label.y - scroll), x - control.x);
+		if (e != CTUI_DATEINPUT_CLOSED)
+			return date_event(e);
+	}
 	for (size_t i = 0; i < f->count; i++) {
 		ctui_rect label, control;
 		if (!ctui_form_slot(f, i, width, &label, &control))
@@ -482,6 +611,22 @@ ctui_form_event ctui_form_click(ctui_form *f, int width, int height, int y,
 		case CTUI_FIELD_LIST: {
 			ctui_form_event e =
 			    choose(fld, fld->first + (size_t)(y - top));
+			return e == CTUI_FORM_NONE ? event : e;
+		}
+		case CTUI_FIELD_DATE: {
+			ctui_form_event e = date_event(
+			    ctui_dateinput_click(&fld->date, 0, x - control.x));
+			return e == CTUI_FORM_NONE ? event : e;
+		}
+		case CTUI_FIELD_TIME: {
+			ctui_form_event e = time_event(
+			    ctui_timeinput_click(&fld->time, 0, x - control.x));
+			return e == CTUI_FORM_NONE ? event : e;
+		}
+		case CTUI_FIELD_DURATION: {
+			ctui_form_event e =
+			    duration_event(ctui_durationinput_click(
+				&fld->duration, 0, x - control.x));
 			return e == CTUI_FORM_NONE ? event : e;
 		}
 		default:
@@ -645,6 +790,52 @@ static void draw_list(const paint *p, const ctui_field *fld, ctui_rect c,
 	}
 }
 
+/* The input drawn by its own component when the control is wide enough, else
+ * its text cut to the control. */
+static void draw_input(const paint *p, const ctui_field *fld, ctui_rect c,
+		       bool focused)
+{
+	int y = p->y + c.y - p->scroll, x = p->x + c.x;
+	char text[CTUI_DURATION_TEXT];
+	const char *shown = NULL;
+	int needed;
+	switch (fld->kind) {
+	case CTUI_FIELD_DATE:
+		needed = CTUI_DATEINPUT_WIDTH;
+		shown = ctui_dateinput_format(ctui_dateinput_date(&fld->date),
+					      text, sizeof text);
+		break;
+	case CTUI_FIELD_TIME:
+		needed = ctui_timeinput_width(
+		    (ctui_time_precision)fld->time.precision);
+		shown = ctui_timeinput_format(
+		    fld->time.micro, (ctui_time_precision)fld->time.precision,
+		    text, sizeof text);
+		break;
+	default:
+		needed = ctui_durationinput_width(&fld->duration);
+		shown = ctui_durationinput_format(
+		    fld->duration.micro,
+		    (ctui_duration_unit)fld->duration.largest,
+		    (ctui_duration_unit)fld->duration.smallest,
+		    fld->duration.digits, text, sizeof text);
+		break;
+	}
+	if (c.width < needed) {
+		int attr = field_attr(p, focused);
+		ctui_fill(y, x, c.width, attr);
+		if (shown)
+			ctui_put(y, x + 1, c.width - 2, shown, attr);
+		return;
+	}
+	if (fld->kind == CTUI_FIELD_DATE)
+		ctui_dateinput_draw(&fld->date, y, x, focused);
+	else if (fld->kind == CTUI_FIELD_TIME)
+		ctui_timeinput_draw(&fld->time, y, x, focused);
+	else
+		ctui_durationinput_draw(&fld->duration, y, x, focused);
+}
+
 /* A rounded outline on the field background, without changing colours. */
 static void draw_border(const paint *p, int y, int x, int height, int width)
 {
@@ -709,10 +900,25 @@ static void form_draw_impl(const ctui_form *f, int y, int x, int width,
 		case CTUI_FIELD_SLIDER:
 			draw_slider(&p, fld, control, focused);
 			break;
+		case CTUI_FIELD_DATE:
+		case CTUI_FIELD_TIME:
+		case CTUI_FIELD_DURATION:
+			draw_input(&p, fld, control, focused);
+			break;
 		default:
 			break;
 		}
 	}
+	/* the month picker of the focused date, over the fields under it */
+	const ctui_field *date = &f->fields[f->focus];
+	ctui_rect label, control;
+	if (f->count && date->kind == CTUI_FIELD_DATE && date->date.open &&
+	    !date->disabled &&
+	    ctui_form_slot(f, f->focus, width, &label, &control) &&
+	    control.width >= CTUI_DATEINPUT_WIDTH &&
+	    row_visible(&p, label.y - p.scroll))
+		ctui_dateinput_draw(&date->date, y + label.y - p.scroll,
+				    x + control.x, true);
 	ctui_rect box;
 	if (f->dropdown && dropdown_box(f, width, height, &box)) {
 		const ctui_field *fld = &f->fields[f->focus];
