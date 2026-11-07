@@ -9,16 +9,21 @@
  *
  *   Title     the text of the event
  *   All day   a checkbox: the event takes the whole day
- *   Starts    HH:MM, disabled for an all-day event
- *   Ends      HH:MM (24:00 is the end of the day), disabled likewise
+ *   Starts    a time field in hours and minutes (see timeinput.h), disabled
+ *             for an all-day event
+ *   Ends      likewise; it stops at 23:59, an event that runs until the end
+ *             of the day is an all-day one
  *
  * and OK / Cancel buttons. A line under the form can carry a note, for
  * instance how many days the event is put on. OK (Enter on a field that
- * takes it, or a click on the button) is refused while the times are wrong
- * (not a time, or the end not after the start); the message says which.
+ * takes it, or a click on the button) is refused while the end is not after
+ * the start; the message says so.
  *
  * The values, the check and the application are pure functions and need no
- * screen. Times are minutes since midnight, as in ctui_cal_event.
+ * screen. Times are minutes since midnight, as in ctui_cal_event; the
+ * values hold them as "HH:MM" texts, which the check also reports when they
+ * are not times (the dialog's time fields cannot make such texts, it keeps
+ * `values` in step with them after every key and click).
  */
 #ifndef CTUI_CALENDAR_EVENT_H
 #define CTUI_CALENDAR_EVENT_H

@@ -114,11 +114,22 @@ const char *ctui_cal_event_error_text(ctui_cal_event_error e)
 
 /* ---- the dialog ---- */
 
+/* A minute of the day as the microseconds of a time field, which stops at
+ * 23:59. */
+static long long minute_micros(int minute)
+{
+	return (long long)clamp(minute, 0, DAY_MINUTES - 1) * 60000000LL;
+}
+
 static void sync(ctui_cal_event_dialog *d)
 {
 	ctui_field *f = d->fields;
 	// NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
 	d->values.all_day = f[F_ALL_DAY].checked;
+	format_time((int)(f[F_START].time.micro / 60000000LL), d->values.start,
+		    sizeof d->values.start);
+	format_time((int)(f[F_END].time.micro / 60000000LL), d->values.end,
+		    sizeof d->values.end);
 	f[F_START].disabled = d->values.all_day;
 	f[F_END].disabled = d->values.all_day;
 	d->error = ctui_cal_event_values_check(&d->values);
@@ -134,8 +145,10 @@ void ctui_cal_event_dialog_init(ctui_cal_event_dialog *d, const char *title,
 	ctui_field *f = d->fields;
 	f[F_TITLE] = ctui_field_text("Title", v->title, sizeof v->title);
 	f[F_ALL_DAY] = ctui_field_check("All day", NULL, v->all_day);
-	f[F_START] = ctui_field_text("Starts", v->start, sizeof v->start);
-	f[F_END] = ctui_field_text("Ends", v->end, sizeof v->end);
+	f[F_START] = ctui_field_time("Starts", CTUI_TIME_MINUTES,
+				     minute_micros(start_minute));
+	f[F_END] = ctui_field_time("Ends", CTUI_TIME_MINUTES,
+				   minute_micros(end_minute));
 	ctui_form_init(&d->form, f, CTUI_CAL_EVENT_FIELDS);
 	d->form.dialog = true;
 	sync(d);
