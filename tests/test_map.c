@@ -10,7 +10,9 @@
 #include "screen.h"
 
 #include <curses.h>
+#include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <ctui/map.h>
 #include <ctui/text.h>
@@ -804,6 +806,251 @@ static void test_tile_cache_and_garbage(void)
 	mb_release();
 }
 
+static const ctui_map_marker CITIES[] = {
+    {.lon = 2.35,
+     .lat = 48.86,
+     .title = "Paris",
+     .text = "lat 48.86 N\nlng 2.35 E"},
+    {.lon = 139.69,
+     .lat = 35.69,
+     .title = "Tokyo",
+     .text = "lat 35.69 N\nlng 139.69 E"},
+    {.lon = 151.21, .lat = -33.87, .title = "Sydney"},
+};
+
+/* The cell where marker i is drawn; false when it is not in view. */
+static bool find_cell(ctui_map *m, int i, int *cy, int *cx)
+{
+	for (int y = 0; y < H; y++)
+		for (int x = 0; x < W; x++)
+			if (ctui_map_marker_at(m, W, H, y, x) == i) {
+				*cy = y;
+				*cx = x;
+				return true;
+			}
+	return false;
+}
+
+static void test_marker_selection(void)
+{
+	ctui_map m;
+	ctui_map_init(&m);
+	CHECK(m.marker == -1 && !m.bubble && m.marker_count == 0);
+	CHECK(ctui_map_select_step(&m, W, H, 1) == CTUI_MAP_NONE);
+	ctui_map_set_markers(&m, CITIES, 3);
+	CHECK(m.marker_count == 3 && m.marker == -1);
+	CHECK(ctui_map_key(&m, '\t', W, H) == CTUI_MAP_SELECTED &&
+	      m.marker == 0);
+	CHECK(ctui_map_key(&m, '\t', W, H) == CTUI_MAP_SELECTED &&
+	      m.marker == 1);
+	CHECK(ctui_map_key(&m, '\t', W, H) == CTUI_MAP_SELECTED &&
+	      m.marker == 2);
+	CHECK(ctui_map_key(&m, '\t', W, H) == CTUI_MAP_SELECTED &&
+	      m.marker == 0);
+	CHECK(ctui_map_key(&m, KEY_BTAB, W, H) == CTUI_MAP_SELECTED &&
+	      m.marker == 2);
+	CHECK(ctui_map_select(&m, W, H, 2) == CTUI_MAP_NONE);
+	CHECK(ctui_map_select(&m, W, H, 7) == CTUI_MAP_SELECTED &&
+	      m.marker == -1);
+	CHECK(ctui_map_select_step(&m, W, H, -1) == CTUI_MAP_SELECTED &&
+	      m.marker == 2);
+	/* a new set of markers clears the selection and the bubble */
+	ctui_map_set_bubble(&m, true);
+	CHECK(m.bubble);
+	ctui_map_set_markers(&m, CITIES, 2);
+	CHECK(m.marker == -1 && !m.bubble && m.marker_count == 2);
+	ctui_map_set_markers(&m, NULL, 5);
+	CHECK(m.marker_count == 0);
+	ctui_map_free(&m);
+}
+
+static void test_marker_bubble_keys(void)
+{
+	ctui_map m;
+	ctui_map_init(&m);
+	ctui_map_set_markers(&m, CITIES, 3);
+	/* nothing to show without a selection */
+	CHECK(ctui_map_key(&m, '\n', W, H) == CTUI_MAP_NONE && !m.bubble);
+	ctui_map_key(&m, '\t', W, H);
+	CHECK(ctui_map_key(&m, '\n', W, H) == CTUI_MAP_BUBBLE && m.bubble);
+	CHECK(ctui_map_key(&m, KEY_ENTER, W, H) == CTUI_MAP_BUBBLE &&
+	      !m.bubble);
+	CHECK(ctui_map_key(&m, '\r', W, H) == CTUI_MAP_BUBBLE && m.bubble);
+	CHECK(ctui_map_key(&m, 27, W, H) == CTUI_MAP_BUBBLE && !m.bubble);
+	CHECK(ctui_map_key(&m, 27, W, H) == CTUI_MAP_NONE);
+	/* moving the selection hides the bubble */
+	ctui_map_key(&m, '\n', W, H);
+	ctui_map_key(&m, '\t', W, H);
+	CHECK(m.marker == 1 && !m.bubble);
+	ctui_map_free(&m);
+}
+
+static void test_marker_cells(void)
+{
+	ctui_map m;
+	ctui_map_init(&m);
+	ctui_map_set_markers(&m, CITIES, 3);
+	int py = 0, px = 0, ty = 0, tx = 0, sy = 0, sx = 0;
+	CHECK(find_cell(&m, 0, &py, &px) && find_cell(&m, 1, &ty, &tx) &&
+	      find_cell(&m, 2, &sy, &sx));
+	/* Paris is north-west of Tokyo and Sydney is south of both */
+	CHECK(px < tx && sy > ty && sy > py);
+	CHECK(ctui_map_marker_at(&m, W, H, -1, 0) == -1);
+	CHECK(ctui_map_marker_at(&m, W, H, 0, W) == -1);
+	CHECK(ctui_map_marker_at(&m, 0, 0, 0, 0) == -1);
+	/* the cell under the marker reads back as the place */
+	double lon, lat;
+	CHECK(ctui_map_lonlat_at(&m, W, H, py, px, &lon, &lat));
+	CHECK(fabs(lon - 2.35) < 2 * 360.0 / W && fabs(lat - 48.86) < 20);
+	/* zoomed in on Paris, the others are out of view */
+	m.view.lon = 2.35;
+	m.view.lat = 48.86;
+	ctui_map_zoom(&m, W, H, 8, -1, -1);
+	CHECK(find_cell(&m, 0, &py, &px) && !find_cell(&m, 1, &ty, &tx));
+	/* selecting a marker out of view brings it in */
+	CHECK(ctui_map_select(&m, W, H, 1) == CTUI_MAP_SELECTED);
+	CHECK(find_cell(&m, 1, &ty, &tx));
+	CHECK(fabs(m.view.lon - 139.69) < 1 && fabs(m.view.lat - 35.69) < 1);
+	ctui_map_free(&m);
+}
+
+static void test_marker_draw(void)
+{
+	screen_open(H, W);
+	ctui_map m;
+	ctui_map_init(&m);
+	m.visible[CTUI_MAP_COASTLINE] = false; /* only the markers are drawn */
+	ctui_map_set_markers(&m, CITIES, 3);
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(dots_in(&m) > 0);
+	CHECK(screen_has_color(ctui_attr_icon(CTUI_ICON_YELLOW, false)));
+	CHECK(!screen_has_color(ctui_attr_icon(CTUI_ICON_ORANGE, false)));
+	CHECK(!screen_has_text("Paris") && !screen_has_text("lat 48.86"));
+	/* each marker is a disc of five dots, like a scatter point */
+	CHECK(dots_in(&m) == 15);
+	int ty = 0, tx = 0;
+	CHECK(find_cell(&m, 1, &ty, &tx));
+	CHECK(ctui_canvas_get(&m.canvas, tx * 2, ty * 4) ||
+	      ctui_canvas_get(&m.canvas, tx * 2 + 1, ty * 4 + 1) ||
+	      ctui_canvas_get(&m.canvas, tx * 2, ty * 4 + 2) ||
+	      ctui_canvas_get(&m.canvas, tx * 2 + 1, ty * 4 + 3));
+	/* the selected one is larger and in its own colour */
+	ctui_map_select(&m, W, H, 1);
+	screen_clear();
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(screen_has_color(ctui_attr_icon(CTUI_ICON_ORANGE, false)));
+	CHECK(dots_in(&m) > 15 && !screen_has_text("Tokyo"));
+	/* the bubble: the title in the top edge, the lines inside */
+	ctui_map_set_bubble(&m, true);
+	screen_clear();
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(screen_has_text("Tokyo") && screen_has_text("lat 35.69 N") &&
+	      screen_has_text("lng 139.69 E"));
+	/* a marker without text still gets a bubble with its title */
+	ctui_map_select(&m, W, H, 2);
+	ctui_map_set_bubble(&m, true);
+	screen_clear();
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(screen_has_text("Sydney") && !screen_has_text("lat 35.69"));
+	/* the bubble stays inside a small area, and below a marker at the top
+	 */
+	ctui_map_select(&m, W, H, 0);
+	ctui_map_set_bubble(&m, true);
+	ctui_map_draw(&m, 2, 3, 30, 8);
+	ctui_map_draw(&m, 0, 0, 12, 4);
+	ctui_map_draw(&m, 0, 0, 5, 3); /* too small for a bubble */
+	m.marker_color = CTUI_ICON_PURPLE;
+	ctui_map_select(&m, W, H, 1);
+	screen_clear();
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(screen_has_color(ctui_attr_icon(CTUI_ICON_PURPLE, false)));
+	ctui_map_free(&m);
+	endwin();
+}
+
+static void test_marker_icons(void)
+{
+	screen_open(H, W);
+	static const ctui_map_marker ICONS[] = {
+	    {.lon = 2.35,
+	     .lat = 48.86,
+	     .icon = "\xe2\x98\x85",
+	     .ascii_icon = "#",
+	     .title = "Paris"},
+	    {.lon = 139.69, .lat = 35.69, .icon = "<>", .title = "Tokyo"},
+	    {.lon = 151.21, .lat = -33.87, .title = "Sydney"},
+	};
+	ctui_map m;
+	ctui_map_init(&m);
+	m.visible[CTUI_MAP_COASTLINE] = false;
+	ctui_map_set_markers(&m, ICONS, 3);
+	ctui_map_draw(&m, 0, 0, W, H);
+	/* the icons are text, only Sydney is a disc of dots */
+	CHECK(screen_has_text("\xe2\x98\x85") && screen_has_text("<>"));
+	CHECK(dots_in(&m) == 5);
+	CHECK(screen_has_color(ctui_attr_icon(CTUI_ICON_YELLOW, false)));
+	/* a click on any column of an icon hits it */
+	int py = 0, px = 0, ty = 0, tx = 0;
+	CHECK(find_cell(&m, 0, &py, &px) && find_cell(&m, 1, &ty, &tx));
+	CHECK(ctui_map_marker_at(&m, W, H, ty, tx + 1) == 1);
+	CHECK(ctui_map_marker_at(&m, W, H, ty, tx + 2) == -1);
+	CHECK(ctui_map_marker_at(&m, W, H, py, px + 1) == -1);
+	/* the selected icon takes the selected colour */
+	ctui_map_select(&m, W, H, 1);
+	screen_clear();
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(screen_has_color(ctui_attr_icon(CTUI_ICON_ORANGE, false)));
+	/* without UTF-8 the ASCII icon is drawn, or "*" when there is none */
+	setenv("CTUI_ASCII", "1", 1);
+	ctui_theme_init();
+	screen_clear();
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(screen_has_text("#") && !screen_has_text("\xe2\x98\x85"));
+	CHECK(!screen_has_text("<>"));
+	ctui_map_free(&m);
+	endwin();
+	unsetenv("CTUI_ASCII");
+}
+
+static void test_marker_mouse(void)
+{
+	ctui_map m;
+	ctui_map_init(&m);
+	ctui_map_set_markers(&m, CITIES, 3);
+	int ty = 0, tx = 0, py = 0, px = 0;
+	CHECK(find_cell(&m, 1, &ty, &tx) && find_cell(&m, 0, &py, &px));
+	/* a click on a star selects it and shows its bubble */
+	CHECK(ctui_map_press(&m, W, H, ty, tx));
+	CHECK(m.marker == -1); /* nothing happens before the release */
+	CHECK(ctui_map_release(&m));
+	CHECK(m.marker == 1 && m.bubble);
+	/* a second click on the same star hides the bubble */
+	ctui_map_press(&m, W, H, ty, tx);
+	ctui_map_release(&m);
+	CHECK(m.marker == 1 && !m.bubble);
+	ctui_map_press(&m, W, H, ty, tx);
+	ctui_map_release(&m);
+	CHECK(m.bubble);
+	/* a click on another star moves the selection */
+	ctui_map_press(&m, W, H, py, px);
+	ctui_map_release(&m);
+	CHECK(m.marker == 0 && m.bubble);
+	/* a click elsewhere hides the bubble and keeps the selection */
+	ctui_map_press(&m, W, H, H - 1, 0);
+	ctui_map_release(&m);
+	CHECK(m.marker == 0 && !m.bubble);
+	/* a drag starting on a star pans the map and is not a click */
+	double lon = m.view.lon;
+	ctui_map_press(&m, W, H, py, px);
+	ctui_map_drag(&m, W, H, py, px + 3);
+	ctui_map_release(&m);
+	CHECK(!m.bubble && m.marker == 0 && m.view.lon != lon);
+	/* a press outside the area is no click */
+	CHECK(!ctui_map_press(&m, W, H, -1, 0));
+	CHECK(!ctui_map_release(&m));
+	ctui_map_free(&m);
+}
+
 int main(void)
 {
 	RUN(test_coastline);
@@ -823,5 +1070,11 @@ int main(void)
 	RUN(test_tile_borders_and_missing);
 	RUN(test_tile_zoom_and_wrap);
 	RUN(test_tile_cache_and_garbage);
+	RUN(test_marker_selection);
+	RUN(test_marker_bubble_keys);
+	RUN(test_marker_cells);
+	RUN(test_marker_draw);
+	RUN(test_marker_icons);
+	RUN(test_marker_mouse);
 	return CHECK_DONE();
 }
