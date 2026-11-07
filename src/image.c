@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "image_pixels.h"
 #include <ctui/text.h>
 #include <ctui/theme.h>
 
@@ -160,7 +161,8 @@ ctui_image_renderer ctui_image_renderer_for(ctui_image_renderer want,
 		return CTUI_IMAGE_ASCII;
 	if (want == CTUI_IMAGE_HALF || want == CTUI_IMAGE_BRAILLE ||
 	    want == CTUI_IMAGE_ASCII)
-		return want;
+		return want; /* PIXELS is AUTO here: the cells of a terminal
+				without graphics */
 	return colors >= 8 ? CTUI_IMAGE_HALF : CTUI_IMAGE_BRAILLE;
 }
 
@@ -190,9 +192,12 @@ static int clamp_round(double v, int lo, int hi)
 	return (int)lround(v);
 }
 
-bool ctui_image_layout_for(int w, int h, int cols, int rows,
-			   const ctui_image_view *view, ctui_image_renderer r,
-			   ctui_image_layout *out)
+/* The layout of a w x h image in a region of cols x rows cells whose pixel
+ * grid is pc x pr per cell and whose cells are `ratio` times taller than
+ * wide. */
+static bool layout(int w, int h, int cols, int rows,
+		   const ctui_image_view *view, int pc, int pr, double ratio,
+		   ctui_image_layout *out)
 {
 	*out = (ctui_image_layout){0};
 	if (w < 1 || h < 1 || cols < 1 || rows < 1)
@@ -214,14 +219,12 @@ bool ctui_image_layout_for(int w, int h, int cols, int rows,
 	sx = sx < 0 ? 0 : sx > w - sw ? w - sw : sx;
 	sy = sy < 0 ? 0 : sy > h - sh ? h - sh : sy;
 
-	int pc, pr;
-	ctui_image_grid(r, &pc, &pr);
 	int dc = cols, dr = rows;
 	if (view->fit == CTUI_IMAGE_FIT) {
-		/* Unit: one cell width; a cell is two units tall. */
-		double scale = fmin(cols / sw, 2.0 * rows / sh);
+		/* Unit: one cell width; a cell is `ratio` units tall. */
+		double scale = fmin(cols / sw, ratio * rows / sh);
 		dc = clamp_round(sw * scale, 1, cols);
-		dr = clamp_round(sh * scale / 2, 1, rows);
+		dr = clamp_round(sh * scale / ratio, 1, rows);
 	}
 	out->cols = dc;
 	out->rows = dr;
@@ -234,6 +237,32 @@ bool ctui_image_layout_for(int w, int h, int cols, int rows,
 	out->sw = sw;
 	out->sh = sh;
 	return true;
+}
+
+bool ctui_image_layout_for(int w, int h, int cols, int rows,
+			   const ctui_image_view *view, ctui_image_renderer r,
+			   ctui_image_layout *out)
+{
+	int pc, pr;
+	ctui_image_grid(r, &pc, &pr);
+	return layout(w, h, cols, rows, view, pc, pr, 2.0, out);
+}
+
+bool ctui_image_layout_pixels(int w, int h, int cols, int rows, int cell_w,
+			      int cell_h, const ctui_image_view *view,
+			      ctui_image_layout *out)
+{
+	if (cell_w < 1 || cell_h < 1) {
+		*out = (ctui_image_layout){0};
+		return false;
+	}
+	/* the pixel grid stays within CTUI_IMAGE_PIXELS_MAX */
+	if (cols > CTUI_IMAGE_PIXELS_MAX / cell_w)
+		cols = CTUI_IMAGE_PIXELS_MAX / cell_w;
+	if (rows > CTUI_IMAGE_PIXELS_MAX / cell_h)
+		rows = CTUI_IMAGE_PIXELS_MAX / cell_h;
+	return layout(w, h, cols, rows, view, cell_w, cell_h,
+		      (double)cell_h / cell_w, out);
 }
 
 #define MAX_TAPS 64 /* source pixels averaged per axis and target pixel */
@@ -584,6 +613,9 @@ ctui_image_renderer ctui_image_draw(const ctui_image *img,
 	ctui_image_view def = ctui_image_view_default();
 	if (!view)
 		view = &def;
+	if (view->renderer == CTUI_IMAGE_PIXELS &&
+	    ctui_image_pixels_draw(img, view, y, x, cols, rows))
+		return CTUI_IMAGE_PIXELS;
 	ctui_image_renderer r =
 	    ctui_image_renderer_for(view->renderer, unicode, depth);
 
