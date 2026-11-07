@@ -339,7 +339,9 @@ are ignored, and `ctui_labels_load()` reads a single file.
   categories with their own colours and visibility, over-zoomed beyond the
   source's maximum zoom, with segments hugging the tile edges skipped. Keys,
   drag and wheel pan and zoom; `ctui_map_hit()` and `ctui_map_categorize()` are
-  pure. Caller-owned markers (`ctui_map_set_markers()`: longitude, latitude,
+  pure. The time zones can be drawn over either source (key `z`): dotted
+  meridians every 15 degrees between the 24 nominal zones, each labelled with
+  its offset from UTC when wide enough. Caller-owned markers (`ctui_map_set_markers()`: longitude, latitude,
   title, text) are drawn as discs of dots like the points of a scatter plot,
   or as any icon text of your choice (`icon`, with an `ascii_icon` fallback):
   Tab and Shift-Tab select the next and the previous one (bringing it into
