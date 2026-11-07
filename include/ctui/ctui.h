@@ -9,6 +9,9 @@
 #include <ctui/frame.h>
 #include <ctui/gauge.h>
 #include <ctui/input.h>
+#include <ctui/inputrule.h>
+#include <ctui/keyboard.h>
+#include <ctui/knob.h>
 #include <ctui/labels.h>
 #include <ctui/layout.h>
 #include <ctui/list.h>
