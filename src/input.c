@@ -10,10 +10,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <ctui/inputrule.h>
 #include <ctui/text.h>
 #include <ctui/theme.h>
 
 #define MASK_GLYPH "*"
+#define RULE_BUF 512 /* bytes of text a rule lays out */
 
 /* ---- characters ------------------------------------------------- */
 
@@ -116,6 +118,70 @@ void ctui_input_set(ctui_input *in, const char *text)
 	ctui_input_insert(in, text ? text : "");
 }
 
+/* ---- rule ------------------------------------------------------- */
+
+static bool rule_edits(const ctui_input *in)
+{
+	return in->rule && (in->rule->accept || in->rule->max_length ||
+			    in->rule->separators || in->rule->format);
+}
+
+/* Characters before `offset` that are not separators of the rule. */
+static size_t significant_before(const ctui_input *in, size_t offset)
+{
+	size_t n = 0;
+	for (size_t i = 0; i < offset && i < len_of(in); i++)
+		if (!ctui_rule_is_separator(in->rule,
+					    (unsigned char)in->text[i]))
+			n++;
+	return n;
+}
+
+/* Lay the text out as the rule wants, the cursor staying after the same
+ * number of characters that are not separators. */
+static void reformat(ctui_input *in)
+{
+	if (!in->rule || !in->rule->format || !in->capacity ||
+	    len_of(in) >= RULE_BUF)
+		return;
+	char compact[RULE_BUF], shown[RULE_BUF];
+	size_t before = significant_before(in, in->cursor);
+	ctui_rule_compact(in->rule, in->text, compact, sizeof compact);
+	ctui_rule_format(in->rule, compact, shown, sizeof shown);
+	size_t n = strlen(shown);
+	if (n + 1 > in->capacity)
+		return;
+	memcpy(in->text, shown, n + 1);
+	size_t pos = 0, seen = 0;
+	while (shown[pos] && seen < before) {
+		if (!ctui_rule_is_separator(in->rule,
+					    (unsigned char)shown[pos]))
+			seen++;
+		pos++;
+	}
+	in->cursor = pos;
+}
+
+void ctui_input_set_rule(ctui_input *in, const ctui_input_rule *rule)
+{
+	in->rule = rule;
+	reformat(in);
+	in->cursor = len_of(in);
+	in->scroll = 0;
+}
+
+ctui_input_state ctui_input_state_of(const ctui_input *in)
+{
+	if (len_of(in) == 0)
+		return CTUI_INPUT_EMPTY;
+	char compact[RULE_BUF];
+	if (len_of(in) >= RULE_BUF)
+		return CTUI_INPUT_INVALID;
+	ctui_rule_compact(in->rule, in->text, compact, sizeof compact);
+	return ctui_rule_valid(in->rule, compact) ? CTUI_INPUT_VALID
+						  : CTUI_INPUT_INVALID;
+}
+
 /* ---- editing ---------------------------------------------------- */
 
 static bool insert_char(ctui_input *in, const char *s, size_t n)
@@ -139,12 +205,34 @@ bool ctui_input_insert(ctui_input *in, const char *s)
 	while (s && *s) {
 		unsigned long cp;
 		size_t n = ctui_utf8_decode(s, &cp);
+		if (rule_edits(in) && n == 1 && printable(cp)) {
+			int ch = (unsigned char)*s;
+			if (ctui_rule_is_separator(in->rule, ch)) {
+				if (in->rule->format) { /* the layout adds it */
+					s++;
+					continue;
+				}
+			} else {
+				char compact[RULE_BUF];
+				ctui_rule_compact(in->rule, in->text, compact,
+						  sizeof compact);
+				if (!ctui_rule_accepts(
+					in->rule, compact,
+					significant_before(in, in->cursor), ch))
+					break;
+			}
+		} else if (rule_edits(in) && n > 1 &&
+			   (in->rule->accept || in->rule->max_length)) {
+			break; /* a rule with a charset takes ASCII only */
+		}
 		if (!printable(cp) || (cp == 0xFFFD && n == 1) ||
 		    !insert_char(in, s, n))
 			break;
 		any = true;
 		s += n;
 	}
+	if (any)
+		reformat(in);
 	return any;
 }
 
@@ -154,21 +242,36 @@ static bool remove_range(ctui_input *in, size_t from, size_t to)
 		return false;
 	memmove(in->text + from, in->text + to, len_of(in) - to + 1);
 	in->cursor = from;
+	reformat(in);
 	return true;
+}
+
+/* Whether the separators of the rule are laid out by it (and so not edited
+ * one by one). */
+static bool laid_out(const ctui_input *in, size_t offset)
+{
+	return in->rule && in->rule->format && offset < len_of(in) &&
+	       ctui_rule_is_separator(in->rule,
+				      (unsigned char)in->text[offset]);
 }
 
 bool ctui_input_backspace(ctui_input *in)
 {
-	return remove_range(in, ctui_input_prev_char(in, in->cursor),
-			    in->cursor);
+	size_t to = in->cursor;
+	/* the separators laid out by the rule go with the character before */
+	while (to > 0 && laid_out(in, to - 1))
+		to--;
+	if (to == 0)
+		return false;
+	return remove_range(in, ctui_input_prev_char(in, to), to);
 }
 
 bool ctui_input_delete(ctui_input *in)
 {
 	size_t at = in->cursor;
-	if (!remove_range(in, at, ctui_input_next_char(in, at)))
-		return false;
-	return true;
+	while (laid_out(in, at))
+		at++;
+	return remove_range(in, at, ctui_input_next_char(in, at));
 }
 
 bool ctui_input_delete_word(ctui_input *in)
@@ -306,9 +409,20 @@ ctui_input_event ctui_input_key(ctui_input *in, int key)
 
 /* ---- display ---------------------------------------------------- */
 
+static bool masked(const ctui_input *in)
+{
+	return in->mask || (in->rule && in->rule->mask);
+}
+
+static const char *placeholder_of(const ctui_input *in)
+{
+	return in->placeholder ? in->placeholder
+			       : (in->rule ? in->rule->hint : NULL);
+}
+
 static int char_cols(const ctui_input *in, unsigned long cp)
 {
-	return in->mask ? 1 : ctui_codepoint_width(cp);
+	return masked(in) ? 1 : ctui_codepoint_width(cp);
 }
 
 size_t ctui_input_columns(const ctui_input *in, size_t from, size_t to)
@@ -377,13 +491,28 @@ void ctui_input_draw(ctui_input *in, int y, int x, int width, bool focused)
 	if (width < 1)
 		return;
 	ctui_style_begin(in->style);
+	/* a rule that can say whether the text is right gets a mark at the end
+	 */
+	int full = width;
+	if (in->rule && in->rule->valid && width > 3)
+		width--;
 	ctui_input_fit(in, width);
 	int attr = ctui_attr(focused ? CTUI_PAIR_SELECTION : CTUI_PAIR_DIALOG,
 			     focused);
-	ctui_fill(y, x, width, attr);
+	ctui_fill(y, x, full, attr);
+	if (width < full) {
+		ctui_input_state state = ctui_input_state_of(in);
+		const ctui_glyphs *g = ctui_theme_glyphs();
+		if (state == CTUI_INPUT_VALID)
+			ctui_put(y, x + width, 1, g->check,
+				 ctui_attr(CTUI_PAIR_GAUGE_GREEN, true));
+		else if (state == CTUI_INPUT_INVALID)
+			ctui_put(y, x + width, 1, g->cross,
+				 ctui_attr(CTUI_PAIR_ERROR, true));
+	}
 	size_t len = len_of(in);
-	if (len == 0 && in->placeholder)
-		ctui_put(y, x, width, in->placeholder,
+	if (len == 0 && placeholder_of(in))
+		ctui_put(y, x, width, placeholder_of(in),
 			 (int)((unsigned)attr | (unsigned)A_DIM));
 	char shown[CTUI_TEXT_MAX];
 	size_t out = 0, i = in->scroll;
@@ -396,7 +525,7 @@ void ctui_input_draw(ctui_input *in, int y, int x, int width, bool focused)
 			break;
 		if (i == in->cursor)
 			cursor_col = cols;
-		if (in->mask) {
+		if (masked(in)) {
 			shown[out++] = MASK_GLYPH[0];
 		} else {
 			memcpy(shown + out, in->text + i, n);
@@ -412,15 +541,15 @@ void ctui_input_draw(ctui_input *in, int y, int x, int width, bool focused)
 		cursor_col = cols;
 	if (focused && cursor_col >= 0) {
 		char under[8] = " ";
-		if (len == 0 && in->placeholder && *in->placeholder) {
+		if (len == 0 && placeholder_of(in) && *placeholder_of(in)) {
 			unsigned long cp;
-			size_t n = ctui_utf8_decode(in->placeholder, &cp);
+			size_t n = ctui_utf8_decode(placeholder_of(in), &cp);
 			if (n < sizeof under) {
-				memcpy(under, in->placeholder, n);
+				memcpy(under, placeholder_of(in), n);
 				under[n] = '\0';
 			}
 		} else if (in->cursor < len) {
-			if (in->mask) {
+			if (masked(in)) {
 				under[0] = MASK_GLYPH[0];
 				under[1] = '\0';
 			} else {

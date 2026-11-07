@@ -30,6 +30,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include <ctui/inputrule.h>
 #include <ctui/theme.h>
 
 typedef struct ctui_input {
@@ -39,7 +40,9 @@ typedef struct ctui_input {
 	size_t scroll;	  /* byte offset of the first visible character */
 	bool mask;	  /* show '*' instead of the characters */
 	size_t max_chars; /* 0 = limited by capacity only */
-	const char *placeholder;  /* shown while empty, may be NULL */
+	const char *placeholder; /* shown while empty, may be NULL */
+	const ctui_input_rule
+	    *rule;		  /* see ctui_input_set_rule(), may be NULL */
 	unsigned char pending[4]; /* bytes of a UTF-8 sequence being typed */
 	int pending_len;
 	const ctui_style
@@ -58,6 +61,24 @@ typedef enum ctui_input_event {
  * empty; the cursor goes to the end. A zero capacity gives an input that
  * accepts no text. */
 void ctui_input_init(ctui_input *in, char *buffer, size_t capacity);
+
+typedef enum ctui_input_state {
+	CTUI_INPUT_EMPTY = 0,
+	CTUI_INPUT_INVALID, /* text the rule does not accept (yet) */
+	CTUI_INPUT_VALID    /* text, and the rule accepts it */
+} ctui_input_state;
+
+/* Follow a rule (inputrule.h): only the characters it accepts can be typed,
+ * the text is laid out as it wants (the cursor stays on the same character),
+ * its mask and its hint apply, and Backspace / Delete take the laid out
+ * separators with the character next to them. The text already there is laid
+ * out at once; NULL gives the rule up. A rule with a `valid` callback makes
+ * the input draw a check mark or a cross at its right end. */
+void ctui_input_set_rule(ctui_input *in, const ctui_input_rule *rule);
+
+/* Whether the text is empty, accepted by the rule (always without one) or
+ * not. */
+ctui_input_state ctui_input_state_of(const ctui_input *in);
 
 /* Characters in the text. */
 size_t ctui_input_length(const ctui_input *in);
