@@ -306,7 +306,10 @@ are ignored, and `ctui_labels_load()` reads a single file.
 - **calendar**: month grid with a cursor day, marked and selected days, week
   and day views with events, repeat rules and events lasting several days. A
   dialog adds an event with its title and its start and end chosen in time
-  fields (`timeinput`), or for the whole day.
+  fields (`timeinput`), or for the whole day, and, on several selected days,
+  a field says how it goes on them: on each day (one separate event on every
+  selected day, at those times, no rule), as a weekly series, or as one
+  event over all of them.
 - **calendar_dialog**: a framed dialog, built on `ctui_form`, to edit the
   recurrence of an event: repeat (none, daily, weekly, monthly, yearly), every
   N, seven weekday checkboxes (weekly only), start date, end (never, on a
