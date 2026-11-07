@@ -396,6 +396,24 @@ static void test_place(void)
 	      g_rc[3].repeat == CTUI_CAL_REPEAT_NONE &&
 	      g_sp[4].extra_days == 0);
 
+	/* the 3rd to the 7th, 10:00 to 11:00: five separate events, not one
+	 * event of five days and not a series that goes on after the 7th */
+	trip_view(&v, 0, 8);
+	ctui_cal_select_clear(&v.sel);
+	ctui_cal_select_set_range(&v.sel, day(2026, 11, 3), day(2026, 11, 7));
+	p = ctui_cal_plan_each(&v.sel);
+	CHECK(ctui_cal_view_place(&v, &p, 600, 660) == CTUI_CAL_VIEW_CREATED &&
+	      v.event_count == 5);
+	for (int k = 0; k < 5; k++)
+		CHECK(g_ev[k].day == day(2026, 11, 3) + k &&
+		      g_ev[k].start_minute == 600 &&
+		      g_ev[k].end_minute == 660 &&
+		      g_rc[k].repeat == CTUI_CAL_REPEAT_NONE &&
+		      g_sp[k].extra_days == 0);
+	CHECK(!ctui_cal_event_occurs(&g_ev[4], &g_rc[4], day(2026, 11, 8)));
+	CHECK(ctui_cal_event_occurs(&g_ev[2], &g_rc[2], day(2026, 11, 5)));
+	CHECK(v.changed == 0 && v.selected == 0);
+
 	/* the 3rd to the 7th, all day: one event of five days */
 	trip_view(&v, 0, 8);
 	ctui_cal_select_clear(&v.sel);

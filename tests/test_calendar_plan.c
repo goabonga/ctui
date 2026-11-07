@@ -115,6 +115,31 @@ static void test_repeat_rules(void)
 	      p.days == 10);
 }
 
+static void test_each_day(void)
+{
+	ctui_cal_place p;
+	ctui_cal_select none = {0}, s = SEL(5);
+	p = ctui_cal_plan_each(&none);
+	CHECK(p.kind == CTUI_CAL_PLACE_NONE && p.events == 0 && p.days == 0);
+	p = ctui_cal_plan_each(&s);
+	CHECK(p.kind == CTUI_CAL_PLACE_SINGLE && p.events == 1 &&
+	      p.first == day(2026, 11, 5));
+	/* the 2nd to the 6th: five events, no rule, whatever the days are */
+	ctui_cal_select_set_range(&s, day(2026, 11, 2), day(2026, 11, 6));
+	p = ctui_cal_plan_each(&s);
+	CHECK(p.kind == CTUI_CAL_PLACE_EACH && p.events == 5 && p.days == 5 &&
+	      p.first == day(2026, 11, 2));
+	CHECK(p.rule.repeat == CTUI_CAL_REPEAT_NONE);
+	/* a weekly selection is not turned into a series */
+	s = SEL(2, 5);
+	p = ctui_cal_plan_each(&s);
+	CHECK(p.kind == CTUI_CAL_PLACE_EACH && p.events == 2 &&
+	      p.rule.repeat == CTUI_CAL_REPEAT_NONE);
+	s = SEL(2, 11, 30);
+	p = ctui_cal_plan_each(&s);
+	CHECK(p.kind == CTUI_CAL_PLACE_EACH && p.events == 3);
+}
+
 static void test_repeat_fallback(void)
 {
 	ctui_cal_place p;
@@ -212,6 +237,7 @@ int main(void)
 {
 	RUN(test_classify);
 	RUN(test_repeat_rules);
+	RUN(test_each_day);
 	RUN(test_repeat_fallback);
 	RUN(test_year_ends_and_leap);
 	RUN(test_span_plan);
