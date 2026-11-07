@@ -94,12 +94,59 @@ static void test_dialog_keys(void)
 	CHECK(ctui_cal_event_dialog_result(&d, &s, &e) == CTUI_CAL_EVENT_OK);
 	CHECK(s == 840 && e == 900);
 
-	/* a wrong time is reported and refuses OK */
-	snprintf(d.values.end, sizeof d.values.end, "13:00");
+	/* an end before the start is reported and refuses OK */
+	ctui_timeinput_set(&d.fields[3].time, 13 * 3600000000LL);
 	ctui_cal_event_dialog_key(&d, KEY_DOWN); /* any key syncs the check */
 	CHECK(d.error == CTUI_CAL_EVENT_END_BEFORE);
+	CHECK_STR(d.values.end, "13:00");
 	CHECK(ctui_cal_event_dialog_result(&d, &s, &e) ==
 	      CTUI_CAL_EVENT_END_BEFORE);
+}
+
+static void type(ctui_cal_event_dialog *d, const char *keys)
+{
+	for (; *keys; keys++)
+		ctui_cal_event_dialog_key(d, *keys);
+}
+
+static void test_dialog_time_fields(void)
+{
+	ctui_cal_event_dialog d;
+	int s = -1, e = -1;
+	ctui_cal_event_dialog_init(&d, "Review", 0, 60, false);
+	CHECK(d.fields[2].kind == CTUI_FIELD_TIME &&
+	      d.fields[3].kind == CTUI_FIELD_TIME);
+	CHECK(d.fields[2].time.precision == CTUI_TIME_MINUTES);
+	/* Starts: hour and minute are typed, then Ends */
+	ctui_cal_event_dialog_key(&d, KEY_DOWN);
+	ctui_cal_event_dialog_key(&d, KEY_DOWN);
+	type(&d, "0930");
+	CHECK_STR(d.values.start, "09:30");
+	ctui_cal_event_dialog_key(&d, KEY_DOWN);
+	type(&d, "1015");
+	CHECK_STR(d.values.end, "10:15");
+	CHECK(ctui_cal_event_dialog_result(&d, &s, &e) == CTUI_CAL_EVENT_OK);
+	CHECK(s == 570 && e == 615);
+	/* PgUp / PgDn step the segment under the cursor */
+	ctui_cal_event_dialog_key(&d, KEY_PPAGE);
+	CHECK_STR(d.values.end, "10:16");
+	/* an end that is not after the start is refused, Enter included */
+	ctui_cal_event_dialog_key(&d, KEY_LEFT);
+	type(&d, "0800");
+	CHECK(d.error == CTUI_CAL_EVENT_END_BEFORE);
+	CHECK(ctui_cal_event_dialog_key(&d, '\n') == CTUI_DIALOG_OPEN);
+	ctui_cal_event_dialog_key(&d, KEY_LEFT);
+	type(&d, "1130");
+	CHECK(d.error == CTUI_CAL_EVENT_OK);
+	CHECK(ctui_cal_event_dialog_key(&d, '\n') == CTUI_DIALOG_ACCEPTED);
+	/* an event ending with the day is an all-day one: 24:00 becomes 23:59
+	 */
+	ctui_cal_event_dialog_init(&d, "Late", 1380, 1440, false);
+	CHECK_STR(d.values.end, "23:59");
+	ctui_cal_event_dialog_init(&d, "Late", 1500, -5, false);
+	CHECK_STR(d.values.start, "23:59");
+	CHECK_STR(d.values.end, "00:00");
+	CHECK(d.error == CTUI_CAL_EVENT_END_BEFORE);
 }
 
 static void test_layout_click_draw(void)
@@ -131,15 +178,21 @@ static void test_layout_click_draw(void)
 	CHECK(ctui_cal_event_dialog_click(&d, LINES, COLS, l.box.y, l.box.x) ==
 	      CTUI_DIALOG_OPEN);
 
-	/* OK is refused while a time is wrong, and the message shows */
-	snprintf(d.values.start, sizeof d.values.start, "99:99");
+	/* OK is refused while the end is not after the start, and the message
+	 * shows */
+	ctui_timeinput_set(&d.fields[3].time, 13 * 3600000000LL);
 	ctui_cal_event_dialog_key(&d, KEY_DOWN);
-	CHECK(d.error == CTUI_CAL_EVENT_BAD_START);
+	CHECK(d.error == CTUI_CAL_EVENT_END_BEFORE);
 	CHECK(ctui_cal_event_dialog_click(&d, LINES, COLS, l.ok.y, l.ok.x) ==
 	      CTUI_DIALOG_OPEN);
 	screen_clear();
 	ctui_cal_event_dialog_draw(&d);
-	CHECK(screen_has_text("type a time as HH:MM"));
+	CHECK(screen_has_text("must come after the start"));
+	/* a click on the hour of Starts focuses the field */
+	ctui_rect form = l.form;
+	CHECK(ctui_cal_event_dialog_click(&d, LINES, COLS, form.y + 2,
+					  form.x + 9 + 1) == CTUI_DIALOG_OPEN);
+	CHECK(d.form.focus == 2);
 }
 
 int main(void)
@@ -147,6 +200,7 @@ int main(void)
 	RUN(test_values);
 	RUN(test_check);
 	RUN(test_dialog_keys);
+	RUN(test_dialog_time_fields);
 	RUN(test_layout_click_draw);
 	return CHECK_DONE();
 }
