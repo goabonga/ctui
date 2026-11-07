@@ -20,15 +20,17 @@
 #define DEFAULT_SOURCE_MAX_ZOOM 14
 #define DEFAULT_CACHE_TILES 64
 #define DEFAULT_CACHE_BYTES ((size_t)64 << 20U)
-#define MAX_TILES 48 /* tiles drawn at once, fewer than the cache holds */
+#define TIMEZONE_COUNT 24 /* zones of 15 degrees */
+#define TIMEZONE_DASH 2	  /* a dot every 2 dots down a meridian */
+#define MAX_TILES 48	  /* tiles drawn at once, fewer than the cache holds */
 
 static const char *const NAMES[CTUI_MAP_CATEGORY_COUNT] = {
-    "water",	"roads",     "rails",	"ferries",   "boundaries",
-    "maritime", "buildings", "aeroway", "coastline", "other",
+    "water",	 "roads",   "rails",	 "ferries", "boundaries", "maritime",
+    "buildings", "aeroway", "coastline", "other",   "timezones",
 };
 
 static const bool DEFAULT_VISIBLE[CTUI_MAP_CATEGORY_COUNT] = {
-    true, true, false, false, true, false, true, true, true, true,
+    true, true, false, false, true, false, true, true, true, true, false,
 };
 
 static const ctui_icon_color DEFAULT_COLORS[CTUI_MAP_CATEGORY_COUNT] = {
@@ -42,6 +44,7 @@ static const ctui_icon_color DEFAULT_COLORS[CTUI_MAP_CATEGORY_COUNT] = {
     CTUI_ICON_GRAY,   /* aeroway */
     CTUI_ICON_GREEN,  /* coastline */
     CTUI_ICON_GRAY,   /* other */
+    CTUI_ICON_PURPLE, /* timezones */
 };
 
 void ctui_map_init(ctui_map *map)
@@ -176,6 +179,8 @@ ctui_map_category ctui_map_category_for_key(int key)
 		return CTUI_MAP_COASTLINE;
 	case 'x':
 		return CTUI_MAP_OTHER;
+	case 'z':
+		return CTUI_MAP_TIMEZONES;
 	default:
 		return CTUI_MAP_NOTHING;
 	}
@@ -549,6 +554,69 @@ ctui_map_category ctui_map_categorize(const ctui_mvt_layer *layer,
 	return CTUI_MAP_OTHER;
 }
 
+/* The copies of the world in view: copy c is shifted by c world widths. Sets
+ * the pixel of the west edge of copy 0 and the width of the world. */
+static void world_copies(const ctui_map *map, int pw, double *ox, double *scale,
+			 long *first, long *last)
+{
+	double cx, cy;
+	*scale = ctui_geo_view_scale(&map->view);
+	ctui_geo_project(map->view.lon, map->view.lat, &cx, &cy);
+	*ox = pw / 2.0 - cx * *scale;
+	*first = (long)floor(-*ox / *scale);
+	*last = (long)ceil((pw - *ox) / *scale) - 1;
+	if (*last - *first > 8)
+		*last = *first + 8;
+}
+
+/* The time zones: a dotted meridian at the dateline and between each two
+ * zones (7.5 + 15 k degrees), once for each copy of the world in view. */
+static void plot_timezones(ctui_map *map, int pw, int ph)
+{
+	double ox, scale;
+	long first, last;
+	world_copies(map, pw, &ox, &scale, &first, &last);
+	for (long copy = first; copy <= last; copy++)
+		for (int j = 0; j < TIMEZONE_COUNT; j++) {
+			double lon = j == 0 ? -180.0 : -172.5 + 15.0 * (j - 1);
+			double px =
+			    ox + ((double)copy + (lon + 180) / 360) * scale;
+			if (px < 0 || px >= pw)
+				continue;
+			for (int dy = 0; dy < ph; dy += TIMEZONE_DASH)
+				ctui_canvas_set(
+				    &map->canvas, (int)px, dy,
+				    map->colors[CTUI_MAP_TIMEZONES]);
+		}
+}
+
+/* The offset from UTC of each zone, at the top of the area, centred on the
+ * meridian of the zone (15 k degrees) and only when the zone is wide enough
+ * to hold it. */
+static void draw_timezone_labels(const ctui_map *map, int y, int x, int width)
+{
+	double ox, scale;
+	long first, last;
+	world_copies(map, width * 2, &ox, &scale, &first, &last);
+	int attr = ctui_attr_icon(map->colors[CTUI_MAP_TIMEZONES], false);
+	double zone_cols = scale / TIMEZONE_COUNT / 2;
+	for (long copy = first; copy <= last; copy++)
+		for (int k = -12; k <= 12; k++) {
+			char label[8];
+			snprintf(label, sizeof label, k ? "%+d" : "0", k);
+			int len = (int)strlen(label);
+			double px =
+			    ox +
+			    ((double)copy + (15.0 * k + 180) / 360) * scale;
+			if (zone_cols < len + 1)
+				continue;
+			int col = (int)(px / 2) - len / 2;
+			if (col < 0 || col + len > width)
+				continue;
+			ctui_put(y, x + col, len, label, attr);
+		}
+}
+
 /* A dot at a fractional position, if it is a sensible one. */
 static void set_dot(ctui_map *map, double x, double y, ctui_icon_color color)
 {
@@ -717,9 +785,13 @@ void ctui_map_draw(ctui_map *map, int y, int x, int width, int height)
 		draw_tiles(map, pw, ph);
 	else if (map->visible[CTUI_MAP_COASTLINE])
 		draw_coast(map, pw, ph);
+	if (map->visible[CTUI_MAP_TIMEZONES])
+		plot_timezones(map, pw, ph);
 	plot_markers(map, width, height);
 	ctui_style_begin(map->style);
 	ctui_canvas_draw(&map->canvas, y, x);
+	if (map->visible[CTUI_MAP_TIMEZONES])
+		draw_timezone_labels(map, y, x, width);
 	if (map->attribution && *map->attribution) {
 		int w = (int)ctui_utf8_columns(map->attribution);
 		if (w > width)

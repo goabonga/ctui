@@ -20,6 +20,11 @@
  * in (the OpenStreetMap contributors, for instance): `attribution` is drawn
  * in the bottom right corner.
  *
+ * The time zones can be drawn over either source: dotted meridians every 15
+ * degrees, half way between the zone centres (the nominal zones, which
+ * political borders only follow roughly), each zone labelled with its offset
+ * from UTC at the top of the area when it is wide enough.
+ *
  * Features are drawn as outlines in categories (water, roads, ...) that
  * can be shown or hidden and recoloured with an ctui_icon_color each. The
  * keys pan (arrows, h j k l) and zoom (+ and -), letters toggle the
@@ -68,6 +73,7 @@ typedef enum ctui_map_category {
 	CTUI_MAP_AEROWAY,
 	CTUI_MAP_COASTLINE, /* the embedded coastline */
 	CTUI_MAP_OTHER,
+	CTUI_MAP_TIMEZONES, /* the lines between the 24 time zones */
 	CTUI_MAP_CATEGORY_COUNT
 } ctui_map_category;
 
@@ -174,7 +180,8 @@ ctui_map_event ctui_map_zoom(ctui_map *map, int width, int height, int steps,
 ctui_map_event ctui_map_key(ctui_map *map, int key, int width, int height);
 
 /* The category toggled by a key (w water, d roads, r rails, f ferries,
- * b boundaries, m maritime, u buildings, a aeroway, c coastline, x other),
+ * b boundaries, m maritime, u buildings, a aeroway, c coastline, x other,
+ * z time zones),
  * or CTUI_MAP_NOTHING. */
 ctui_map_category ctui_map_category_for_key(int key);
 
