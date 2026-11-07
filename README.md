@@ -154,7 +154,11 @@ are ignored, and `ctui_labels_load()` reads a single file.
   `style` overrides the colours.
 - **form**: labelled fields aligned on their labels: text (optionally masked),
   checkbox, select with a dropdown, slider and list, with focus movement,
-  scrolling and mouse support; drawn on the page or inside a dialog.
+  scrolling and mouse support; drawn on the page or inside a dialog. Date
+  fields (with the month picker of `dateinput`), time fields and duration
+  fields (hours down to microseconds, with optional limits) reuse the inputs
+  above: PgUp / PgDn and `+` / `-` step the segment under the cursor while Up
+  / Down move between the fields.
 - **picker**: centred file, folder and file-or-folder chooser dialogs browsing one folder at a
   time, with hidden-file toggle, sizes, icons and mouse support.
 - **slider**: standalone horizontal or vertical fader with a filled track, knob,
