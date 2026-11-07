@@ -135,6 +135,14 @@ are ignored, and `ctui_labels_load()` reads a single file.
   without the C locale, with at most 15 significant digits, so parsing
   cannot overflow (`ctui_numinput_parse()`, `ctui_numinput_format()`);
   `style` overrides its colours.
+- **timeinput**: time of day field `HH:MM`, `HH:MM:SS`, `HH:MM:SS.fff` or
+  `HH:MM:SS.ffffff` edited segment by segment, the value being the
+  microseconds since midnight cut to the precision of the field, with an
+  optional minimum and maximum that typing and stepping respect. Digits are
+  typed into the segment (those of the fraction fill it from the left), Up /
+  Down and the wheel step it (wrapping without carry), PgUp / PgDn step by ten
+  and a click selects a segment. `ctui_timeinput_parse()` and
+  `ctui_timeinput_format()` are pure; `style` overrides its colours.
 
 ## Tests
 
