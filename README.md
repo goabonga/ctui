@@ -120,6 +120,14 @@ are ignored, and `ctui_labels_load()` reads a single file.
   `style` overrides its colours. The editing operations work on byte offsets
   without a screen; there is no selection. The text field of `form` stays
   append-only.
+- **inputrule**: rules for the text of an input, as plain structs of settings
+  and callbacks: the characters that may be typed, a maximum length, layout
+  separators, a layout function and a validity check, applied by
+  `ctui_input_set_rule()`. Ready-made rules: `ctui_rule_password` (masked),
+  `ctui_rule_email`, `ctui_rule_phone` (`+` and 7 to 15 digits) and
+  `ctui_rule_card` (digits in groups of four, Luhn checksum); a program adds
+  its own the same way. The functions that apply a rule and
+  `ctui_luhn_valid()` are pure.
 
 ## Tests
 
