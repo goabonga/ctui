@@ -538,6 +538,104 @@ static void test_input_draw(void)
 	endwin();
 }
 
+static void test_text_editor(void)
+{
+	char buf[16] = "Ada";
+	ctui_field fields[] = {ctui_field_text("Name", buf, sizeof buf),
+			       ctui_field_text("Other", buf + 8, 8)};
+	ctui_form f;
+	ctui_form_init(&f, fields, 2);
+	/* the cursor starts at the end and moves, typing inserts at it */
+	CHECK(ctui_form_key(&f, KEY_LEFT) == CTUI_FORM_MOVED);
+	CHECK(ctui_form_key(&f, 'X') == CTUI_FORM_CHANGED);
+	CHECK_STR(buf, "AdXa");
+	CHECK(ctui_form_key(&f, KEY_HOME) == CTUI_FORM_MOVED);
+	ctui_form_key(&f, '>');
+	CHECK_STR(buf, ">AdXa");
+	CHECK(ctui_form_key(&f, KEY_DC) == CTUI_FORM_NONE ||
+	      strcmp(buf, ">dXa") == 0);
+	CHECK(ctui_form_key(&f, 5) == CTUI_FORM_MOVED);	   /* Ctrl-E */
+	CHECK(ctui_form_key(&f, 21) == CTUI_FORM_CHANGED); /* Ctrl-U */
+	CHECK_STR(buf, "");
+	/* Enter submits, the settings of the field reach the editor */
+	CHECK(ctui_form_key(&f, '\n') == CTUI_FORM_SUBMITTED);
+	fields[0].max_chars = 3;
+	keys(&f, "abcdef");
+	CHECK_STR(buf, "abc");
+	fields[0].max_chars = 0;
+	fields[0].mask = true;
+	fields[0].placeholder = "your name";
+	CHECK(f.fields[0].input.cursor == 3);
+	/* a click places the cursor: control at column 7, text from column 1 */
+	CHECK(ctui_form_click(&f, 40, 4, 0, 7) == CTUI_FORM_MOVED);
+	CHECK(f.fields[0].input.cursor == 0);
+	CHECK(ctui_form_click(&f, 40, 4, 0, 7) == CTUI_FORM_NONE);
+	screen_open(24, 80);
+	screen_clear();
+	ctui_form_draw(&f, 0, 0, 40, 4);
+	CHECK(screen_has_text("***") && !screen_has_text("abc"));
+	buf[0] = '\0';
+	screen_clear();
+	ctui_form_draw(&f, 0, 0, 40, 4);
+	CHECK(screen_has_text("your name"));
+	endwin();
+}
+
+static void test_number_field(void)
+{
+	ctui_field fields[] = {
+	    ctui_field_number("Quantity", 0, 100, 5, 20, 0),
+	    ctui_field_number("Price", -10, 10, 0.5, 1.5, 2)};
+	fields[0].number.unit = "pcs";
+	ctui_form f;
+	ctui_form_init(&f, fields, 2);
+	CHECK(fields[0].kind == CTUI_FIELD_NUMBER && ctui_form_editing(&f));
+	CHECK_NEAR(fields[0].number.value, 20, 1e-9);
+	/* PgUp / PgDn add or subtract one step, Up / Down change the field */
+	CHECK(ctui_form_key(&f, KEY_PPAGE) == CTUI_FORM_CHANGED);
+	CHECK_NEAR(fields[0].number.value, 25, 1e-9);
+	CHECK(ctui_form_key(&f, KEY_NPAGE) == CTUI_FORM_CHANGED);
+	CHECK(ctui_form_key(&f, KEY_NPAGE) == CTUI_FORM_CHANGED);
+	CHECK_NEAR(fields[0].number.value, 15, 1e-9);
+	CHECK(ctui_form_key(&f, KEY_END) == CTUI_FORM_CHANGED);
+	CHECK_NEAR(fields[0].number.value, 100, 1e-9);
+	CHECK(ctui_form_key(&f, KEY_PPAGE) == CTUI_FORM_NONE); /* at the end */
+	/* typed digits are validated; leaving the field commits them */
+	keys(&f, "7");
+	CHECK(fields[0].number.editing);
+	CHECK(ctui_form_key(&f, KEY_DOWN) == CTUI_FORM_MOVED && f.focus == 1);
+	CHECK(!fields[0].number.editing);
+	CHECK_NEAR(fields[0].number.value, 7, 1e-9);
+	keys(&f, "-3.25");
+	CHECK(ctui_form_key(&f, '\n') == CTUI_FORM_SUBMITTED);
+	CHECK_NEAR(fields[1].number.value, -3.25, 1e-9);
+	CHECK(ctui_form_key(&f, 'x') == CTUI_FORM_NONE);
+	CHECK(ctui_form_key(&f, 27) == CTUI_FORM_CANCELLED);
+	/* the buttons of the field: control from column 10, 20 wide at most */
+	CHECK(ctui_form_click(&f, 60, 4, 1, 10 + 19) == CTUI_FORM_CHANGED);
+	CHECK_NEAR(fields[1].number.value, -2.75, 1e-9);
+	CHECK(ctui_form_click(&f, 60, 4, 1, 10) == CTUI_FORM_CHANGED);
+	CHECK(ctui_form_click(&f, 60, 4, 1, 10 + 5) == CTUI_FORM_NONE);
+	/* clicking another field commits the one being typed */
+	ctui_form_key(&f, KEY_UP);
+	keys(&f, "42");
+	CHECK(fields[0].number.editing);
+	CHECK(ctui_form_click(&f, 60, 4, 1, 0) == CTUI_FORM_MOVED);
+	CHECK(!fields[0].number.editing);
+	CHECK_NEAR(fields[0].number.value, 42, 1e-9);
+
+	screen_open(24, 80);
+	screen_clear();
+	ctui_form_draw(&f, 0, 0, 60, 4);
+	CHECK(screen_has_text("42") && screen_has_text("pcs") &&
+	      screen_has_text("-3.25"));
+	f.dialog = true;
+	screen_clear();
+	ctui_form_draw(&f, 0, 0, 60, 4);
+	CHECK(screen_has_text("42"));
+	endwin();
+}
+
 int main(void)
 {
 	RUN(test_constructors);
@@ -562,5 +660,7 @@ int main(void)
 	RUN(test_duration_field);
 	RUN(test_input_clicks);
 	RUN(test_input_draw);
+	RUN(test_text_editor);
+	RUN(test_number_field);
 	return CHECK_DONE();
 }
