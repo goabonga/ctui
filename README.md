@@ -169,7 +169,8 @@ are ignored, and `ctui_labels_load()` reads a single file.
   `ctui_durationinput_parse()` reads `1h 30m 5s 250ms 10us` and
   `ctui_durationinput_format()` writes the field text; both are pure and
   `style` overrides the colours.
-- **form**: labelled fields aligned on their labels: text (optionally masked),
+- **form**: labelled fields aligned on their labels: text (edited with
+  `input`: cursor, placeholder, mask, length limit), number (`numinput`),
   checkbox, select with a dropdown, slider and list, with focus movement,
   scrolling and mouse support; drawn on the page or inside a dialog. Date
   fields (with the month picker of `dateinput`), time fields and duration
