@@ -98,6 +98,20 @@ ctui_cal_place ctui_cal_plan_repeat(const ctui_cal_select *s)
 	return p;
 }
 
+ctui_cal_place ctui_cal_plan_each(const ctui_cal_select *s)
+{
+	ctui_cal_place p = {.kind = CTUI_CAL_PLACE_NONE,
+			    .first = ctui_cal_select_first(s),
+			    .days = s->count};
+	if (s->count == 0)
+		return p;
+	p.events = s->count;
+	p.kind = s->count == 1 ? CTUI_CAL_PLACE_SINGLE : CTUI_CAL_PLACE_EACH;
+	if (s->count == 1)
+		p.events = 1;
+	return p;
+}
+
 ctui_cal_place ctui_cal_plan_span(const ctui_cal_select *s)
 {
 	ctui_cal_place p = {.kind = CTUI_CAL_PLACE_NONE,

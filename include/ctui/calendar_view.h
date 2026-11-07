@@ -643,6 +643,10 @@ void ctui_cal_move_clamp_span(long duration, long day, int start, int slot,
  *     one separate event on every selected day, no rule.
  *  B. one event over the selection: when the days are consecutive, a single
  *     event that lasts all of them (SPAN, see ctui_cal_span).
+ *  C. each day: one separate event on every selected day, whatever the
+ *     days, with no rule, so it does not go on after the last of them and
+ *     does not last from the first to the last (EACH, ctui_cal_plan_each()).
+ *     This is the one to choose for "10:00 to 11:00 on the 1st to the 5th".
  */
 typedef enum ctui_cal_sel_kind {
 	CTUI_CAL_SEL_NONE = 0, /* no day selected */
@@ -677,6 +681,11 @@ typedef struct ctui_cal_place {
 
 /* Way A for the selection. */
 ctui_cal_place ctui_cal_plan_repeat(const ctui_cal_select *s);
+
+/* Way C for the selection: one separate event on every selected day and
+ * nothing else, no rule and no span: EACH for two days or more, SINGLE for
+ * one, NONE for an empty selection. */
+ctui_cal_place ctui_cal_plan_each(const ctui_cal_select *s);
 
 /* Way B for the selection: SPAN for consecutive days (two or more), SINGLE
  * for one day, NONE for an empty or a non-consecutive selection. */
