@@ -339,7 +339,13 @@ are ignored, and `ctui_labels_load()` reads a single file.
   categories with their own colours and visibility, over-zoomed beyond the
   source's maximum zoom, with segments hugging the tile edges skipped. Keys,
   drag and wheel pan and zoom; `ctui_map_hit()` and `ctui_map_categorize()` are
-  pure. The library has no network, SQLite or zlib dependency.
+  pure. Caller-owned markers (`ctui_map_set_markers()`: longitude, latitude,
+  title, text) are drawn as discs of dots like the points of a scatter plot,
+  or as any icon text of your choice (`icon`, with an `ascii_icon` fallback):
+  Tab and Shift-Tab select the next and the previous one (bringing it into
+  view, the selected one larger and in its own colour), Enter or a click shows
+  an info bubble with its title and lines of text, Escape or a click elsewhere
+  hides it. The library has no network, SQLite or zlib dependency.
 - **image**: displays a caller-supplied RGB or RGBA pixel buffer (width,
   height, channels, stride), without any decoding library: half blocks (two
   pixels per cell), Braille dots (2 x 4 pixels per cell, colour averaged) or
