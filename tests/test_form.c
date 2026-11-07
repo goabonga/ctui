@@ -636,6 +636,46 @@ static void test_number_field(void)
 	endwin();
 }
 
+static void test_text_rules(void)
+{
+	char card[32] = "", mail[48] = "", pass[16] = "";
+	ctui_field fields[] = {ctui_field_text("Card", card, sizeof card),
+			       ctui_field_text("Mail", mail, sizeof mail),
+			       ctui_field_text("Pass", pass, sizeof pass)};
+	fields[0].rule = &ctui_rule_card;
+	fields[1].rule = &ctui_rule_email;
+	fields[2].rule = &ctui_rule_password;
+	ctui_form f;
+	ctui_form_init(&f, fields, 3);
+	keys(&f, "4111x111111111111");
+	CHECK_STR(card, "4111 1111 1111 1111");
+	CHECK(ctui_form_key(&f, 'z') == CTUI_FORM_NONE); /* digits only */
+	ctui_form_key(&f, KEY_DOWN);
+	keys(&f, "ada@example.com");
+	CHECK_STR(mail, "ada@example.com");
+	ctui_form_key(&f, KEY_DOWN);
+	keys(&f, "s3cret");
+	CHECK_STR(pass, "s3cret");
+	screen_open(24, 80);
+	screen_clear();
+	ctui_form_draw(&f, 0, 0, 50, 4);
+	CHECK(screen_has_text("4111 1111 1111 1111") &&
+	      screen_has_text("ada@example.com"));
+	CHECK(screen_has_text("\xe2\x9c\x93")); /* the check marks */
+	CHECK(screen_has_text("******") && !screen_has_text("s3cret"));
+	CHECK(f.fields[0].input.rule == &ctui_rule_card);
+	/* the text there before the rule is laid out when it is first used */
+	char late[32] = "4111111111111111";
+	ctui_field one[] = {ctui_field_text("Card", late, sizeof late)};
+	one[0].rule = &ctui_rule_card;
+	ctui_form g;
+	ctui_form_init(&g, one, 1);
+	screen_clear();
+	ctui_form_draw(&g, 0, 0, 50, 2);
+	CHECK_STR(late, "4111 1111 1111 1111");
+	endwin();
+}
+
 int main(void)
 {
 	RUN(test_constructors);
@@ -662,5 +702,6 @@ int main(void)
 	RUN(test_input_draw);
 	RUN(test_text_editor);
 	RUN(test_number_field);
+	RUN(test_text_rules);
 	return CHECK_DONE();
 }
