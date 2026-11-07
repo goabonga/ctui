@@ -13,6 +13,8 @@
  *             for an all-day event
  *   Ends      likewise; it stops at 23:59, an event that runs until the end
  *             of the day is an all-day one
+ *   Days      only when ways were set: how the event goes on the selected days
+ *             (on each day, as a weekly series, as one event over them all)
  *
  * and OK / Cancel buttons. A line under the form can carry a note, for
  * instance how many days the event is put on. OK (Enter on a field that
@@ -72,12 +74,15 @@ const char *ctui_cal_event_error_text(ctui_cal_event_error e);
 
 /* ---- the dialog ---- */
 
-#define CTUI_CAL_EVENT_FIELDS 4
+/* The fifth field, Days, is there only when the caller gives ways. */
+#define CTUI_CAL_EVENT_FIELDS 5
 
 typedef struct ctui_cal_event_dialog {
 	ctui_cal_event_values values;
 	ctui_field fields[CTUI_CAL_EVENT_FIELDS]; /* point into `values`: do
 						     not copy the dialog */
+	const char *const *ways; /* see ctui_cal_event_dialog_set_ways() */
+	size_t way_count;
 	ctui_form form;
 	ctui_cal_event_error error; /* what is wrong with the values now */
 	const char *title;	    /* default "New event" */
@@ -90,6 +95,15 @@ typedef struct ctui_cal_event_dialog {
 /* Open the dialog. The dialog must stay where it is while it is used. */
 void ctui_cal_event_dialog_init(ctui_cal_event_dialog *d, const char *title,
 				int start_minute, int end_minute, bool all_day);
+
+/* Offer ways to put the event on the days it is for (a select field "Days",
+ * the first way being chosen): count of at least 2 shows it, anything less
+ * hides it. The strings must outlive the dialog. */
+void ctui_cal_event_dialog_set_ways(ctui_cal_event_dialog *d,
+				    const char *const *ways, size_t count);
+
+/* The way chosen in the field Days (0 without ways). */
+size_t ctui_cal_event_dialog_way(const ctui_cal_event_dialog *d);
 
 /* Feed a key: Enter on a field that takes it is OK, accepted only when the
  * values are valid, Esc cancels. */

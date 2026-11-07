@@ -15,7 +15,9 @@
 #include <ctui/text.h>
 #include <ctui/theme.h>
 
-enum { F_TITLE, F_ALL_DAY, F_START, F_END };
+enum { F_TITLE, F_ALL_DAY, F_START, F_END, F_DAYS };
+
+#define BASE_FIELDS 4 /* the fields that are always there */
 
 #define DAY_MINUTES 1440
 
@@ -149,10 +151,30 @@ void ctui_cal_event_dialog_init(ctui_cal_event_dialog *d, const char *title,
 				     minute_micros(start_minute));
 	f[F_END] = ctui_field_time("Ends", CTUI_TIME_MINUTES,
 				   minute_micros(end_minute));
-	ctui_form_init(&d->form, f, CTUI_CAL_EVENT_FIELDS);
+	ctui_form_init(&d->form, f, BASE_FIELDS);
 	d->form.dialog = true;
 	sync(d);
-	ctui_form_init(&d->form, f, CTUI_CAL_EVENT_FIELDS);
+	ctui_form_init(&d->form, f, BASE_FIELDS);
+}
+
+void ctui_cal_event_dialog_set_ways(ctui_cal_event_dialog *d,
+				    const char *const *ways, size_t count)
+{
+	if (!ways || count < 2) {
+		d->ways = NULL;
+		d->way_count = 0;
+		d->form.count = BASE_FIELDS;
+		return;
+	}
+	d->ways = ways;
+	d->way_count = count;
+	d->fields[F_DAYS] = ctui_field_select("Days", ways, count, 0);
+	d->form.count = BASE_FIELDS + 1;
+}
+
+size_t ctui_cal_event_dialog_way(const ctui_cal_event_dialog *d)
+{
+	return d->way_count ? d->fields[F_DAYS].choice : 0;
 }
 
 ctui_dialog_result ctui_cal_event_dialog_key(ctui_cal_event_dialog *d, int key)
@@ -178,9 +200,11 @@ ctui_cal_event_dialog_result(const ctui_cal_event_dialog *d, int *start_minute,
 /* ---- layout, click and drawing ---- */
 
 #define BOX_WIDTH 46
-#define BOX_HEIGHT                                                             \
-	(CTUI_CAL_EVENT_FIELDS +                                               \
-	 5) /* the fields, a message, a note, the buttons, the frame */
+/* The fields, a message, a note, the buttons, the frame. */
+static int box_height(const ctui_cal_event_dialog *d)
+{
+	return (d ? (int)d->form.count : BASE_FIELDS) + 5;
+}
 
 /* The captions of the buttons, "[ OK ]" and "[ Cancel ]" by default. */
 static void captions(const ctui_cal_event_dialog *d, char *ok, size_t okcap,
@@ -201,7 +225,7 @@ bool ctui_cal_event_dialog_layout_for(const ctui_cal_event_dialog *d, int lines,
 	int ok_width = (int)ctui_utf8_columns(ok),
 	    cancel_width = (int)ctui_utf8_columns(cancel);
 	ctui_rect box;
-	if (!ctui_dialog_box(lines, cols, BOX_WIDTH, BOX_HEIGHT, &box) ||
+	if (!ctui_dialog_box(lines, cols, BOX_WIDTH, box_height(d), &box) ||
 	    box.width < 36 || box.height < 9)
 		return false;
 	int formh = box.height - 5;
