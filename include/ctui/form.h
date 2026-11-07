@@ -16,7 +16,9 @@
  *           moves, word jumps, Backspace, Delete, Ctrl-W/U/K, sideways
  *           scrolling and a click that places the cursor; mask hides it
  *           behind '*', max_chars bounds it and placeholder shows while it
- *           is empty.
+ *           is empty; a rule (inputrule.h: password, e-mail, phone number,
+ *           bank card, or one of your own) limits and lays out what is
+ *           typed and marks the text right or wrong.
  *   check   Space toggles.
  *   select  Left/Right step through the options; Enter / Space open a
  *           dropdown (Up/Down/Home/End move, Enter / Space choose, Esc
@@ -82,6 +84,7 @@ typedef struct ctui_field {
 	size_t max_chars; /* 0 = limited by the buffer only */
 	const char
 	    *placeholder; /* shown while the text is empty, may be NULL */
+	const ctui_input_rule *rule; /* what may be typed, see inputrule.h */
 	ctui_input input; /* the editor of the text, set by the constructor */
 	/* check */
 	bool checked;

@@ -257,6 +257,8 @@ static ctui_input *text_input(const ctui_field *f)
 	in->mask = f->mask;
 	in->max_chars = f->max_chars;
 	in->placeholder = f->placeholder;
+	if (in->rule != f->rule)
+		ctui_input_set_rule(in, f->rule);
 	return in;
 }
 
