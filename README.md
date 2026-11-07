@@ -117,9 +117,9 @@ are ignored, and `ctui_labels_load()` reads a single file.
   Delete, Ctrl-W / Ctrl-U / Ctrl-K, UTF-8 typed byte by byte, wide
   characters, an optional `*` mask, a `max_chars` limit, a placeholder,
   sideways scrolling inside its width and a click that places the cursor;
-  `style` overrides its colours. The editing operations work on byte offsets
-  without a screen; there is no selection. The text field of `form` stays
-  append-only.
+  `style` overrides its colours. A rule (see `inputrule`) limits and lays out
+  the text and marks it right or wrong. The editing operations work on byte
+  offsets without a screen; there is no selection.
 - **inputrule**: rules for the text of an input, as plain structs of settings
   and callbacks: the characters that may be typed, a maximum length, layout
   separators, a layout function and a validity check, applied by
