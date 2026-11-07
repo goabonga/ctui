@@ -102,6 +102,8 @@ static void test_defaults(void)
 	CHECK(ctui_map_max_zoom(&m) == CTUI_MAP_OFFLINE_MAX_ZOOM &&
 	      !m.dragging);
 	CHECK_STR(ctui_map_category_name(CTUI_MAP_RAILS), "rails");
+	CHECK_STR(ctui_map_category_name(CTUI_MAP_TIMEZONES), "timezones");
+	CHECK(!m.visible[CTUI_MAP_TIMEZONES]); /* off until asked for */
 	CHECK_STR(ctui_map_category_name(CTUI_MAP_NOTHING), "");
 	CHECK_STR(ctui_map_category_name(CTUI_MAP_CATEGORY_COUNT), "");
 	ctui_map_free(&m);
@@ -206,11 +208,11 @@ static void test_keys(void)
 	CHECK(ctui_map_key(&m, 'q', W, H) == CTUI_MAP_NONE &&
 	      ctui_map_key(&m, KEY_F(2), W, H) == CTUI_MAP_NONE);
 	CHECK(ctui_map_key(&m, 'l', 0, 0) == CTUI_MAP_NONE);
-	const char *keys = "wdrfbmuacx";
+	const char *keys = "wdrfbmuacxz";
 	for (int i = 0; i < CTUI_MAP_CATEGORY_COUNT; i++)
 		CHECK(ctui_map_category_for_key(keys[i]) ==
 		      (ctui_map_category)i);
-	CHECK(ctui_map_category_for_key('z') == CTUI_MAP_NOTHING &&
+	CHECK(ctui_map_category_for_key('y') == CTUI_MAP_NOTHING &&
 	      ctui_map_category_for_key(KEY_UP) == CTUI_MAP_NOTHING);
 	CHECK(ctui_map_set_visible(&m, CTUI_MAP_WATER, false) ==
 	      CTUI_MAP_TOGGLED);
@@ -806,6 +808,52 @@ static void test_tile_cache_and_garbage(void)
 	mb_release();
 }
 
+static void test_timezones(void)
+{
+	screen_open(H, W);
+	ctui_map m;
+	ctui_map_init(&m);
+	m.visible[CTUI_MAP_COASTLINE] = false;
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(dots_in(&m) == 0 && !screen_has_text("+9"));
+	/* z shows the zones: a dotted meridian between each two and the offsets
+	 */
+	CHECK(ctui_map_key(&m, 'z', W, H) == CTUI_MAP_TOGGLED);
+	screen_clear();
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(dots_in(&m) > 0);
+	CHECK(screen_has_color(ctui_attr_icon(CTUI_ICON_PURPLE, false)));
+	/* 24 lines per world width, whatever the number of copies in view */
+	int lines = 0;
+	for (int x = 0; x < W * 2; x++)
+		lines += ctui_canvas_get(&m.canvas, x, 0);
+	double per_world = 24.0 * (W * 2) / ctui_geo_view_scale(&m.view);
+	CHECK(fabs(lines - per_world) <= 2);
+	CHECK(
+	    !screen_has_text("+9")); /* the zones are too narrow for a label */
+	/* a dot on the meridian of Greenwich + 7.5 degrees, and none on 0 */
+	CHECK(dot_near(&m, 7.5, 0, 1) && dot_near(&m, -172.5, 0, 1));
+	CHECK(!dot_near(&m, 0, 0, 0));
+	/* zoomed in, the zones are wide and carry their offsets */
+	ctui_map_zoom(&m, W, H, 2, -1, -1);
+	screen_clear();
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(screen_has_text("+9") && screen_has_text("-5") &&
+	      screen_has_text("+1"));
+	/* the same over the vector tiles, and the colour is the category's */
+	m.colors[CTUI_MAP_TIMEZONES] = CTUI_ICON_CYAN;
+	screen_clear();
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(screen_has_color(ctui_attr_icon(CTUI_ICON_CYAN, false)));
+	/* z again hides them */
+	CHECK(ctui_map_key(&m, 'z', W, H) == CTUI_MAP_TOGGLED);
+	screen_clear();
+	ctui_map_draw(&m, 0, 0, W, H);
+	CHECK(dots_in(&m) == 0);
+	ctui_map_free(&m);
+	endwin();
+}
+
 static const ctui_map_marker CITIES[] = {
     {.lon = 2.35,
      .lat = 48.86,
@@ -1070,6 +1118,7 @@ int main(void)
 	RUN(test_tile_borders_and_missing);
 	RUN(test_tile_zoom_and_wrap);
 	RUN(test_tile_cache_and_garbage);
+	RUN(test_timezones);
 	RUN(test_marker_selection);
 	RUN(test_marker_bubble_keys);
 	RUN(test_marker_cells);
