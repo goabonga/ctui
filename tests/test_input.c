@@ -8,6 +8,7 @@
 #include "screen.h"
 
 #include <curses.h>
+#include <string.h>
 
 #include <ctui/input.h>
 
@@ -340,6 +341,157 @@ static void test_draw(void)
 	CHECK(!screen_has_color(ctui_attr_color(CTUI_C_RED, -1)));
 }
 
+static void typed(ctui_input *in, const char *keys)
+{
+	for (; *keys; keys++)
+		ctui_input_key(in, (unsigned char)*keys);
+}
+
+static void test_rule_card(void)
+{
+	char buf[32] = "";
+	ctui_input in;
+	ctui_input_init(&in, buf, sizeof buf);
+	ctui_input_set_rule(&in, &ctui_rule_card);
+	CHECK(ctui_input_state_of(&in) == CTUI_INPUT_EMPTY);
+	/* letters are refused, the groups of four are laid out as typed */
+	typed(&in, "41a11 1111-1111 1111");
+	CHECK_STR(buf, "4111 1111 1111 1111");
+	CHECK(in.cursor == strlen(buf));
+	CHECK(ctui_input_state_of(&in) == CTUI_INPUT_VALID);
+	/* no more than 19 digits */
+	typed(&in, "999");
+	CHECK_STR(buf, "4111 1111 1111 1111 999");
+	typed(&in, "99");
+	CHECK_STR(buf, "4111 1111 1111 1111 999");
+	CHECK(ctui_input_insert(&in, "9") == false);
+	CHECK(ctui_input_state_of(&in) == CTUI_INPUT_INVALID); /* Luhn */
+	/* Backspace takes the layout space with the digit before it */
+	ctui_input_set(&in, "41111");
+	CHECK_STR(buf, "4111 1");
+	ctui_input_key(&in, KEY_BACKSPACE);
+	CHECK_STR(buf, "4111");
+	ctui_input_set(&in, "41111111");
+	in.cursor = 5; /* right after the space */
+	CHECK(ctui_input_backspace(&in));
+	CHECK_STR(buf, "4111 111");
+	CHECK(in.cursor == 3);
+	/* typing in the middle keeps the cursor on the same digit */
+	ctui_input_set(&in, "41111111");
+	in.cursor = 2;
+	typed(&in, "9");
+	CHECK_STR(buf, "4191 1111 1");
+	CHECK(in.cursor == 3);
+	/* Delete jumps over the space */
+	in.cursor = 4;
+	CHECK(ctui_input_delete(&in));
+	CHECK_STR(buf, "4191 1111");
+	/* the digits pasted whole */
+	ctui_input_set(&in, "4111 1111 1111 1111");
+	CHECK_STR(buf, "4111 1111 1111 1111");
+	/* a space is consumed: the layout adds its own */
+	CHECK(ctui_input_insert(&in, " ") == false && in.cursor == strlen(buf));
+	/* a character the rule refuses stops the paste where it is */
+	ctui_input_set(&in, "4111-1111");
+	CHECK_STR(buf, "4111");
+	/* a text that does not fit its buffer is left as it is */
+	char small[8] = "";
+	ctui_input tiny;
+	ctui_input_init(&tiny, small, sizeof small);
+	ctui_input_set_rule(&tiny, &ctui_rule_card);
+	typed(&tiny, "41111");
+	CHECK_STR(small, "4111 1");
+	typed(&tiny, "11");
+	CHECK(strlen(small) < sizeof small);
+}
+
+static void test_rule_email_phone_password(void)
+{
+	char buf[64] = "";
+	ctui_input in;
+	ctui_input_init(&in, buf, sizeof buf);
+	ctui_input_set_rule(&in, &ctui_rule_email);
+	typed(&in, "ada lovelace@@example.com, ");
+	CHECK_STR(buf, "adalovelace@example.com");
+	CHECK(ctui_input_state_of(&in) == CTUI_INPUT_VALID);
+	CHECK(!ctui_input_insert(&in, "\xc3\xa9"));
+	ctui_input_set(&in, "ada@example");
+	CHECK(ctui_input_state_of(&in) == CTUI_INPUT_INVALID);
+	/* the hint shows while empty */
+	ctui_input_set(&in, "");
+
+	char ph[32] = "";
+	ctui_input p;
+	ctui_input_init(&p, ph, sizeof ph);
+	ctui_input_set_rule(&p, &ctui_rule_phone);
+	typed(&p, "+33 6.12-34 (56)78x+9");
+	CHECK_STR(ph, "+33 6.12-34 (56)789");
+	CHECK(ctui_input_state_of(&p) == CTUI_INPUT_VALID);
+	ctui_input_set(&p, "12 34");
+	CHECK(ctui_input_state_of(&p) == CTUI_INPUT_INVALID);
+	/* typed separators are real characters here, Backspace removes one */
+	ctui_input_set(&p, "12 ");
+	CHECK(ctui_input_backspace(&p));
+	CHECK_STR(ph, "12");
+
+	char pw[16] = "";
+	ctui_input q;
+	ctui_input_init(&q, pw, sizeof pw);
+	ctui_input_set_rule(&q, &ctui_rule_password);
+	typed(&q, "s3cr" E_ACUTE "t");
+	CHECK_STR(pw, "s3cr" E_ACUTE "t");
+	CHECK(ctui_input_state_of(&q) == CTUI_INPUT_VALID);
+	/* a rule can be given up, the text stays */
+	ctui_input_set_rule(&q, NULL);
+	CHECK(q.rule == NULL && strlen(pw) > 0);
+	/* an input with no rule is valid whenever it holds text */
+	CHECK(ctui_input_state_of(&q) == CTUI_INPUT_VALID);
+}
+
+static void test_rule_set_rule_formats_text(void)
+{
+	char buf[32] = "4111111111111111";
+	ctui_input in;
+	ctui_input_init(&in, buf, sizeof buf);
+	ctui_input_set_rule(&in, &ctui_rule_card);
+	CHECK_STR(buf, "4111 1111 1111 1111");
+	CHECK(in.cursor == strlen(buf) && in.scroll == 0);
+}
+
+static void test_rule_draw(void)
+{
+	screen_open(24, 80);
+	char buf[32] = "";
+	ctui_input in;
+	ctui_input_init(&in, buf, sizeof buf);
+	ctui_input_set_rule(&in, &ctui_rule_card);
+	screen_clear();
+	ctui_input_draw(&in, 1, 2, 30, false);
+	CHECK(screen_has_text("1234 5678 9012 3456")); /* the hint */
+	typed(&in, "4111111111111111");
+	screen_clear();
+	ctui_input_draw(&in, 1, 2, 30, true);
+	CHECK(screen_has_text("4111 1111 1111 1111") &&
+	      screen_has_text("\xe2\x9c\x93"));
+	typed(&in, "9");
+	ctui_input_set(&in, "4111");
+	screen_clear();
+	ctui_input_draw(&in, 1, 2, 30, false);
+	CHECK(screen_has_text("\xe2\x9c\x97")); /* a cross: not complete */
+	/* the mask of a rule hides the characters */
+	char pw[16] = "";
+	ctui_input q;
+	ctui_input_init(&q, pw, sizeof pw);
+	ctui_input_set_rule(&q, &ctui_rule_password);
+	typed(&q, "abc");
+	screen_clear();
+	ctui_input_draw(&q, 1, 2, 10, false);
+	CHECK(screen_has_text("***") && !screen_has_text("abc"));
+	/* no room for the mark on a narrow field: the text keeps it */
+	ctui_input_draw(&in, 1, 2, 3, true);
+	endwin();
+}
+
 int main(void)
 {
 	RUN(test_init);
@@ -355,5 +507,9 @@ int main(void)
 	RUN(test_columns_and_scroll);
 	RUN(test_click);
 	RUN(test_draw);
+	RUN(test_rule_card);
+	RUN(test_rule_email_phone_password);
+	RUN(test_rule_set_rule_formats_text);
+	RUN(test_rule_draw);
 	return CHECK_DONE();
 }
