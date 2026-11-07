@@ -19,7 +19,7 @@
 #define VALUE_WIDTH 8 /* columns right of a slider track */
 #define DROPDOWN_ROWS 8
 #define PAGE_STEPS 10
-#define MASK_MAX 255
+#define NUMBER_WIDTH 20 /* columns of a number field, at most */
 
 /* ---- fields ----------------------------------------------------- */
 
@@ -27,10 +27,20 @@ ctui_field ctui_field_text(const char *label, char *buffer, size_t capacity)
 {
 	if (capacity)
 		buffer[capacity - 1] = '\0';
-	return (ctui_field){.kind = CTUI_FIELD_TEXT,
-			    .label = label,
-			    .text = buffer,
-			    .capacity = capacity};
+	ctui_field f = {.kind = CTUI_FIELD_TEXT,
+			.label = label,
+			.text = buffer,
+			.capacity = capacity};
+	ctui_input_init(&f.input, buffer, capacity);
+	return f;
+}
+
+ctui_field ctui_field_number(const char *label, double min, double max,
+			     double step, double value, int decimals)
+{
+	ctui_field f = {.kind = CTUI_FIELD_NUMBER, .label = label};
+	ctui_numinput_init(&f.number, min, max, step, value, decimals);
+	return f;
 }
 
 ctui_field ctui_field_check(const char *label, const char *caption,
@@ -112,7 +122,7 @@ ctui_field ctui_field_duration(const char *label, ctui_duration_unit largest,
 static bool is_input(const ctui_field *f)
 {
 	return f->kind == CTUI_FIELD_DATE || f->kind == CTUI_FIELD_TIME ||
-	       f->kind == CTUI_FIELD_DURATION;
+	       f->kind == CTUI_FIELD_DURATION || f->kind == CTUI_FIELD_NUMBER;
 }
 
 static int field_rows(const ctui_field *f)
@@ -236,42 +246,49 @@ static ctui_form_event choose(ctui_field *f, size_t choice)
 	return f->choice != before ? CTUI_FORM_CHANGED : CTUI_FORM_NONE;
 }
 
+/* Bring the editor of a text field up to date with the settings of the
+ * field, which the caller may change after the constructor. */
+static ctui_input *text_input(const ctui_field *f)
+{
+	// NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+	ctui_input *in = (ctui_input *)&f->input;
+	in->text = f->text;
+	in->capacity = f->capacity;
+	in->mask = f->mask;
+	in->max_chars = f->max_chars;
+	in->placeholder = f->placeholder;
+	return in;
+}
+
 static ctui_form_event edit_text(ctui_field *f, int key)
 {
 	if (!f->text || f->capacity == 0)
 		return CTUI_FORM_NONE;
-	size_t used = strlen(f->text);
-	if (key == 21) { /* Ctrl-U */
-		f->text[0] = '\0';
-		return used ? CTUI_FORM_CHANGED : CTUI_FORM_NONE;
-	}
-	if (key == KEY_BACKSPACE || key == 127 || key == 8) {
-		if (!used)
-			return CTUI_FORM_NONE;
-		/* Remove a whole UTF-8 character: skip continuation bytes. */
-		do
-			used--;
-		while (used && ((unsigned)(unsigned char)f->text[used] &
-				0xC0U) == 0x80U);
-		f->text[used] = '\0';
+	switch (ctui_input_key(text_input(f), key)) {
+	case CTUI_INPUT_CHANGED:
 		return CTUI_FORM_CHANGED;
+	case CTUI_INPUT_MOVED:
+		return CTUI_FORM_MOVED;
+	case CTUI_INPUT_SUBMITTED:
+		return CTUI_FORM_SUBMITTED;
+	default:
+		return CTUI_FORM_NONE;
 	}
-	if (key >= 32 && key <= 255 && key != 127 && used + 1 < f->capacity) {
-		f->text[used++] = (char)key;
-		f->text[used] = '\0';
-		return CTUI_FORM_CHANGED;
-	}
-	return CTUI_FORM_NONE;
 }
 
-/* ---- keys ------------------------------------------------------- */
+/* The focus leaves a field: a number being typed becomes its value. */
+static void commit(ctui_field *f)
+{
+	if (f->kind == CTUI_FIELD_NUMBER)
+		ctui_numinput_commit(&f->number);
+}
 
-/* Move the focus to the next enabled field in direction (+1/-1). */
 static ctui_form_event move_focus(ctui_form *f, int direction)
 {
 	for (long i = (long)f->focus + direction; i >= 0 && i < (long)f->count;
 	     i += direction)
 		if (!f->fields[i].disabled) {
+			commit(&f->fields[f->focus]);
 			f->focus = (size_t)i;
 			f->dropdown = false;
 			return CTUI_FORM_MOVED;
@@ -410,8 +427,30 @@ static int step_of(int key, bool date)
 	return 0;
 }
 
+static ctui_form_event number_key(ctui_field *fld, int key)
+{
+	/* PgUp / PgDn add or subtract one step (Up / Down move between fields)
+	 */
+	if (key == KEY_PPAGE)
+		key = KEY_UP;
+	else if (key == KEY_NPAGE)
+		key = KEY_DOWN;
+	switch (ctui_numinput_key(&fld->number, key)) {
+	case CTUI_NUMINPUT_CHANGED:
+		return CTUI_FORM_CHANGED;
+	case CTUI_NUMINPUT_SUBMITTED:
+		return CTUI_FORM_SUBMITTED;
+	case CTUI_NUMINPUT_CANCELLED:
+		return CTUI_FORM_CANCELLED;
+	default:
+		return CTUI_FORM_NONE;
+	}
+}
+
 static ctui_form_event input_key(ctui_field *fld, int key)
 {
+	if (fld->kind == CTUI_FIELD_NUMBER)
+		return number_key(fld, key);
 	int step = step_of(key, fld->kind == CTUI_FIELD_DATE);
 	if (fld->kind == CTUI_FIELD_DATE) {
 		if (step)
@@ -495,6 +534,7 @@ ctui_form_event ctui_form_key(ctui_form *f, int key)
 	case CTUI_FIELD_DATE:
 	case CTUI_FIELD_TIME:
 	case CTUI_FIELD_DURATION:
+	case CTUI_FIELD_NUMBER:
 		return input_key(fld, key);
 	default:
 		return CTUI_FORM_NONE;
@@ -580,6 +620,7 @@ ctui_form_event ctui_form_click(ctui_form *f, int width, int height, int y,
 			return CTUI_FORM_NONE;
 		ctui_form_event event = CTUI_FORM_NONE;
 		if (f->focus != i) {
+			commit(&f->fields[f->focus]);
 			f->focus = i;
 			event = CTUI_FORM_MOVED;
 		}
@@ -613,6 +654,20 @@ ctui_form_event ctui_form_click(ctui_form *f, int width, int height, int y,
 			    choose(fld, fld->first + (size_t)(y - top));
 			return e == CTUI_FORM_NONE ? event : e;
 		}
+		case CTUI_FIELD_TEXT:
+			if (fld->text && fld->capacity &&
+			    ctui_input_click(text_input(fld), control.width,
+					     x - control.x))
+				return CTUI_FORM_MOVED;
+			return event;
+		case CTUI_FIELD_NUMBER:
+			if (ctui_numinput_click(
+				&fld->number,
+				control.width < NUMBER_WIDTH ? control.width
+							     : NUMBER_WIDTH,
+				0, x - control.x) == CTUI_NUMINPUT_CHANGED)
+				return CTUI_FORM_CHANGED;
+			return event;
 		case CTUI_FIELD_DATE: {
 			ctui_form_event e = date_event(
 			    ctui_dateinput_click(&fld->date, 0, x - control.x));
@@ -672,33 +727,36 @@ static bool row_visible(const paint *p, int row)
 	return row >= 0 && row < p->height;
 }
 
+/* On a dialog the fields are inset in the body colour, which the input
+ * components get by taking it as their dialog colour. */
+static void inset_begin(const paint *p, ctui_style *inset)
+{
+	*inset = (ctui_style){0};
+	if (p->dialog)
+		inset->attr[CTUI_PAIR_DIALOG] =
+		    ctui_attr(CTUI_PAIR_BODY, false);
+	ctui_style_begin(p->dialog ? inset : NULL);
+}
+
 static void draw_text(const paint *p, const ctui_field *fld, ctui_rect c,
 		      bool focused)
 {
-	int row = c.y - p->scroll;
-	int attr = field_attr(p, focused);
-	ctui_fill(p->y + row, p->x + c.x, c.width, attr);
-	char shown[CTUI_TEXT_MAX];
-	const char *text = fld->text ? fld->text : "";
-	if (fld->mask) {
-		size_t n = ctui_utf8_columns(text);
-		if (n > MASK_MAX)
-			n = MASK_MAX;
-		memset(shown, '*', n);
-		shown[n] = '\0';
-		text = shown;
-	}
-	/* Show the tail that fits, leaving a cell for the cursor. */
-	size_t room = (size_t)(c.width > 3 ? c.width - 3 : 0);
-	while (*text && ctui_utf8_columns(text) > room) {
-		unsigned long cp;
-		text += ctui_utf8_decode(text, &cp);
-	}
-	int used =
-	    ctui_put(p->y + row, p->x + c.x + 1, c.width - 2, text, attr);
-	if (focused && used + 1 < c.width - 1)
-		ctui_put(p->y + row, p->x + c.x + 1 + used, 1, " ",
-			 (int)((unsigned)attr | (unsigned)A_REVERSE));
+	ctui_style inset;
+	inset_begin(p, &inset);
+	ctui_input_draw(text_input(fld), p->y + c.y - p->scroll, p->x + c.x,
+			c.width, focused);
+	ctui_style_end();
+}
+
+static void draw_number(const paint *p, const ctui_field *fld, ctui_rect c,
+			bool focused)
+{
+	ctui_style inset;
+	inset_begin(p, &inset);
+	ctui_numinput_draw(&fld->number, p->y + c.y - p->scroll, p->x + c.x,
+			   c.width < NUMBER_WIDTH ? c.width : NUMBER_WIDTH,
+			   focused);
+	ctui_style_end();
 }
 
 static void draw_check(const paint *p, const ctui_field *fld, ctui_rect c,
@@ -828,12 +886,15 @@ static void draw_input(const paint *p, const ctui_field *fld, ctui_rect c,
 			ctui_put(y, x + 1, c.width - 2, shown, attr);
 		return;
 	}
+	ctui_style inset;
+	inset_begin(p, &inset);
 	if (fld->kind == CTUI_FIELD_DATE)
 		ctui_dateinput_draw(&fld->date, y, x, focused);
 	else if (fld->kind == CTUI_FIELD_TIME)
 		ctui_timeinput_draw(&fld->time, y, x, focused);
 	else
 		ctui_durationinput_draw(&fld->duration, y, x, focused);
+	ctui_style_end();
 }
 
 /* A rounded outline on the field background, without changing colours. */
@@ -899,6 +960,9 @@ static void form_draw_impl(const ctui_form *f, int y, int x, int width,
 			break;
 		case CTUI_FIELD_SLIDER:
 			draw_slider(&p, fld, control, focused);
+			break;
+		case CTUI_FIELD_NUMBER:
+			draw_number(&p, fld, control, focused);
 			break;
 		case CTUI_FIELD_DATE:
 		case CTUI_FIELD_TIME:

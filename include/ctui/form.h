@@ -12,8 +12,11 @@
  * to ctui_form_key() or clicks to ctui_form_click(), redraw with
  * ctui_form_draw().
  *
- *   text    edits UTF-8 text in a caller buffer; Backspace, Ctrl-U; mask
- *           hides it behind '*'.
+ *   text    edits UTF-8 text in a caller buffer with a ctui_input: cursor
+ *           moves, word jumps, Backspace, Delete, Ctrl-W/U/K, sideways
+ *           scrolling and a click that places the cursor; mask hides it
+ *           behind '*', max_chars bounds it and placeholder shows while it
+ *           is empty.
  *   check   Space toggles.
  *   select  Left/Right step through the options; Enter / Space open a
  *           dropdown (Up/Down/Home/End move, Enter / Space choose, Esc
@@ -22,6 +25,9 @@
  *           ends.
  *   list    a box of rows showing several options at once; Up/Down/Home/
  *           End/PgUp/PgDn move the choice.
+ *   number  a ctui_numinput (range, step, decimals, unit): digits are typed,
+ *           PgUp/PgDn add or subtract a step (Home/End go to the ends), Enter
+ *           submits and the value is committed when the focus leaves.
  *   date    a ctui_dateinput; Left/Right change the segment, digits and
  *           '-' type, PgUp/PgDn step it, Enter opens its month picker (the
  *           keys of ctui_calendar then apply, Enter picks, Esc closes).
@@ -48,6 +54,8 @@
 #include <ctui/dateinput.h>
 #include <ctui/dialog.h>
 #include <ctui/durationinput.h>
+#include <ctui/input.h>
+#include <ctui/numinput.h>
 #include <ctui/timeinput.h>
 
 typedef enum ctui_field_kind {
@@ -58,7 +66,8 @@ typedef enum ctui_field_kind {
 	CTUI_FIELD_LIST,
 	CTUI_FIELD_DATE,
 	CTUI_FIELD_TIME,
-	CTUI_FIELD_DURATION
+	CTUI_FIELD_DURATION,
+	CTUI_FIELD_NUMBER
 } ctui_field_kind;
 
 // NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
@@ -70,6 +79,10 @@ typedef struct ctui_field {
 	char *text;	 /* caller buffer, NUL-terminated */
 	size_t capacity; /* bytes, including the NUL */
 	bool mask;
+	size_t max_chars; /* 0 = limited by the buffer only */
+	const char
+	    *placeholder; /* shown while the text is empty, may be NULL */
+	ctui_input input; /* the editor of the text, set by the constructor */
 	/* check */
 	bool checked;
 	const char *caption; /* shown after the box, may be NULL */
@@ -88,6 +101,9 @@ typedef struct ctui_field {
 	ctui_dateinput date;
 	ctui_timeinput time;
 	ctui_durationinput duration;
+	/* number: the value lives in the input, read it there (.number.value);
+	 * its unit and other settings are set on it after the constructor */
+	ctui_numinput number;
 } ctui_field;
 
 ctui_field ctui_field_text(const char *label, char *buffer, size_t capacity);
@@ -103,6 +119,8 @@ ctui_field ctui_field_list(const char *label, const char *const *options,
 /* A date (an invalid one gives 1970-01-01), a time of day cut to the
  * precision, and a duration from the largest to the smallest unit; see the
  * constructors of the inputs for the details. */
+ctui_field ctui_field_number(const char *label, double min, double max,
+			     double step, double value, int decimals);
 ctui_field ctui_field_date(const char *label, int year, int month, int day);
 ctui_field ctui_field_time(const char *label, ctui_time_precision precision,
 			   long long micro);
@@ -133,8 +151,8 @@ typedef enum ctui_form_event {
 /* Focus the first enabled field. */
 void ctui_form_init(ctui_form *f, ctui_field *fields, size_t count);
 
-/* True while the focused field takes typed characters (a text, date, time or
- * duration field), or a dropdown or a month picker is open. */
+/* True while the focused field takes typed characters (a text, number, date,
+ * time or duration field), or a dropdown or a month picker is open. */
 bool ctui_form_editing(const ctui_form *f);
 
 ctui_form_event ctui_form_key(ctui_form *f, int key);
