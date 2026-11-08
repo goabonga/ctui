@@ -70,7 +70,7 @@
 #include <ctui/waveform.h>
 #include <ctui/wizard.h>
 
-#define CTUI_VERSION "0.0.0"
+#define CTUI_VERSION "0.1.0"
 
 /* Returns the library version as a static string, e.g. "0.0.0". */
 const char *ctui_version(void);
