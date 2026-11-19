@@ -14,6 +14,133 @@
 #include <ctui/text.h>
 #include <ctui/textview.h>
 
+/* ---- external storage and bounded reads ---- */
+
+static size_t line_start(const ctui_textarea *t, size_t line)
+{
+	return t->source.read ? t->source.line_start(t->source.ctx, line)
+			      : t->starts[line];
+}
+
+bool ctui_textarea_init_source(ctui_textarea *t,
+			       const ctui_textarea_source *source)
+{
+	*t = (ctui_textarea){0};
+	if (!source || !source->length || !source->lines ||
+	    !source->line_start || !source->read)
+		return false;
+	size_t len = source->length(source->ctx),
+	       lines = source->lines(source->ctx);
+	if (len == (size_t)-1 || !lines || lines - 1 > len ||
+	    source->line_start(source->ctx, 0) != 0 ||
+	    source->line_start(source->ctx, lines - 1) > len)
+		return false;
+	t->source = *source;
+	t->len = len;
+	t->line_count = lines;
+	t->read_only = source->replace == NULL;
+	return true;
+}
+
+bool ctui_textarea_read(const ctui_textarea *t, size_t offset, char *out,
+			size_t n)
+{
+	if (offset > t->len || n > t->len - offset || (n && !out))
+		return false;
+	if (!t->source.read) {
+		if (n)
+			memcpy(out, t->text + offset, n);
+		return true;
+	}
+	while (n) {
+		size_t chunk =
+		    n < CTUI_TEXTAREA_CHUNK ? n : CTUI_TEXTAREA_CHUNK;
+		if (!t->source.read(t->source.ctx, offset, out, chunk))
+			return false;
+		offset += chunk;
+		out += chunk;
+		n -= chunk;
+	}
+	return true;
+}
+
+void ctui_textarea_line_bounds(const ctui_textarea *t, size_t i, size_t *start,
+			       size_t *len)
+{
+	if (i >= t->line_count)
+		i = t->line_count - 1;
+	*start = line_start(t, i);
+	*len = (i + 1 < t->line_count ? line_start(t, i + 1) - 1 : t->len) -
+	       *start;
+}
+
+/* A local cache, never a full line. Refill before decoding a UTF-8 character
+ * straddling a chunk boundary. The extra NUL bounds malformed sequences. */
+typedef struct text_reader {
+	const ctui_textarea *area;
+	size_t offset, count;
+	char bytes[CTUI_TEXTAREA_CHUNK + 1];
+} text_reader;
+
+static const char *reader_at(text_reader *r, size_t offset, size_t end)
+{
+	size_t need = end - offset < 4 ? end - offset : 4;
+	if (!r->count || offset < r->offset || offset - r->offset > r->count ||
+	    need > r->count - (offset - r->offset)) {
+		r->offset = offset;
+		r->count = end - offset < CTUI_TEXTAREA_CHUNK
+			       ? end - offset
+			       : CTUI_TEXTAREA_CHUNK;
+		if (!ctui_textarea_read(r->area, offset, r->bytes, r->count)) {
+			r->count = 0;
+			return NULL;
+		}
+		r->bytes[r->count] = 0;
+	}
+	return r->bytes + (offset - r->offset);
+}
+
+static size_t reader_decode(text_reader *r, size_t offset, size_t end,
+			    unsigned long *cp)
+{
+	const char *s = reader_at(r, offset, end);
+	return s ? ctui_utf8_decode(s, cp) : 0;
+}
+
+static size_t line_column(const ctui_textarea *t, size_t line, size_t byte)
+{
+	size_t start, len;
+	ctui_textarea_line_bounds(t, line, &start, &len);
+	text_reader r = {.area = t};
+	size_t col = 0, i = 0;
+	while (i < len && i < byte) {
+		unsigned long cp;
+		size_t n = reader_decode(&r, start + i, start + len, &cp);
+		if (!n)
+			break;
+		col += ctui_cell_width(cp, col);
+		i += n;
+	}
+	return col;
+}
+
+static size_t line_byte(const ctui_textarea *t, size_t line, size_t column)
+{
+	size_t start, len;
+	ctui_textarea_line_bounds(t, line, &start, &len);
+	text_reader r = {.area = t};
+	size_t col = 0, i = 0;
+	while (i < len) {
+		unsigned long cp;
+		size_t n = reader_decode(&r, start + i, start + len, &cp);
+		if (!n || column < col + ctui_cell_width(cp, col))
+			break;
+		col += ctui_cell_width(cp, col);
+		i += n;
+	}
+	return i;
+}
+
 /* ---- buffer and line index ---- */
 
 static size_t count_newlines(const char *s, size_t n)
@@ -77,6 +204,14 @@ static void index_lines(ctui_textarea *t)
 static bool splice(ctui_textarea *t, size_t pos, size_t del, const char *ins,
 		   size_t n)
 {
+	if (t->source.read) {
+		if (!t->source.replace ||
+		    !t->source.replace(t->source.ctx, pos, del, ins, n))
+			return false;
+		t->len = t->source.length(t->source.ctx);
+		t->line_count = t->source.lines(t->source.ctx);
+		return true;
+	}
 	size_t lines = t->line_count - count_newlines(t->text + pos, del) +
 		       count_newlines(ins, n);
 	if (!reserve_text(t, t->len - del + n) || !reserve_lines(t, lines))
@@ -150,7 +285,7 @@ void ctui_textarea_free(ctui_textarea *t)
 
 const char *ctui_textarea_text(const ctui_textarea *t)
 {
-	return t->text ? t->text : "";
+	return t->source.read ? NULL : t->text ? t->text : "";
 }
 
 size_t ctui_textarea_length(const ctui_textarea *t)
@@ -160,11 +295,9 @@ size_t ctui_textarea_length(const ctui_textarea *t)
 
 const char *ctui_textarea_line(const ctui_textarea *t, size_t i, size_t *len)
 {
-	if (i >= t->line_count)
-		i = t->line_count - 1;
-	size_t start = t->starts[i];
-	*len = (i + 1 < t->line_count ? t->starts[i + 1] - 1 : t->len) - start;
-	return t->text + start;
+	size_t start;
+	ctui_textarea_line_bounds(t, i, &start, len);
+	return t->source.read ? NULL : t->text + start;
 }
 
 void ctui_textarea_locate(const ctui_textarea *t, size_t offset, size_t *line,
@@ -176,22 +309,22 @@ void ctui_textarea_locate(const ctui_textarea *t, size_t offset, size_t *line,
 	       hi = t->line_count; /* last line whose start is <= offset */
 	while (hi - lo > 1) {
 		size_t mid = lo + (hi - lo) / 2;
-		if (t->starts[mid] <= offset)
+		if (line_start(t, mid) <= offset)
 			lo = mid;
 		else
 			hi = mid;
 	}
 	*line = lo;
-	*byte = offset - t->starts[lo];
+	*byte = offset - line_start(t, lo);
 }
 
 size_t ctui_textarea_offset(const ctui_textarea *t, size_t line, size_t byte)
 {
 	if (line >= t->line_count)
 		line = t->line_count - 1;
-	size_t len;
-	ctui_textarea_line(t, line, &len);
-	return t->starts[line] + (byte > len ? len : byte);
+	size_t start, len;
+	ctui_textarea_line_bounds(t, line, &start, &len);
+	return start + (byte > len ? len : byte);
 }
 
 size_t ctui_textarea_prev(const ctui_textarea *t, size_t offset)
@@ -200,7 +333,10 @@ size_t ctui_textarea_prev(const ctui_textarea *t, size_t offset)
 		offset = t->len;
 	while (offset > 0) {
 		offset--;
-		if (((unsigned)(unsigned char)t->text[offset] & 0xC0U) != 0x80U)
+		char c;
+		if (!ctui_textarea_read(t, offset, &c, 1))
+			return offset + 1;
+		if (((unsigned)(unsigned char)c & 0xC0U) != 0x80U)
 			break;
 	}
 	return offset;
@@ -211,16 +347,16 @@ size_t ctui_textarea_next(const ctui_textarea *t, size_t offset)
 	if (offset >= t->len)
 		return t->len;
 	unsigned long cp;
-	size_t n = ctui_utf8_decode(t->text + offset, &cp);
+	text_reader r = {.area = t};
+	size_t n = reader_decode(&r, offset, t->len, &cp);
 	return offset + n > t->len ? t->len : offset + n;
 }
 
 size_t ctui_textarea_column(const ctui_textarea *t)
 {
-	size_t line, byte, len;
+	size_t line, byte;
 	ctui_textarea_locate(t, t->cursor, &line, &byte);
-	const char *s = ctui_textarea_line(t, line, &len);
-	return ctui_line_column(s, len, byte);
+	return line_column(t, line, byte);
 }
 
 bool ctui_textarea_range(const ctui_textarea *t, size_t *first, size_t *last)
@@ -256,6 +392,21 @@ static char *dup_bytes(const char *s, size_t n)
 	return p;
 }
 
+static char *dup_range(const ctui_textarea *t, size_t pos, size_t n)
+{
+	if (n == (size_t)-1)
+		return NULL;
+	char *copy = malloc(n + 1);
+	if (!copy)
+		return NULL;
+	if (!ctui_textarea_read(t, pos, copy, n)) {
+		free(copy);
+		return NULL;
+	}
+	copy[n] = 0;
+	return copy;
+}
+
 /* Room for one more undo record; the oldest goes when the history is full. */
 static bool undo_room(ctui_textarea *t)
 {
@@ -284,6 +435,7 @@ static bool apply(ctui_textarea *t, size_t pos, size_t del, const char *ins,
 		  size_t n, size_t cursor_after, bool merge)
 {
 	if (t->read_only || pos > t->len || del > t->len - pos ||
+	    n > (size_t)-1 - 1 - (t->len - del) || (n && !ins) ||
 	    (del == 0 && n == 0))
 		return false;
 	if (t->max_bytes && n > del && t->len - del + n > t->max_bytes)
@@ -309,7 +461,7 @@ static bool apply(ctui_textarea *t, size_t pos, size_t del, const char *ins,
 					.added_len = n,
 					.before = t->cursor,
 					.after = cursor_after};
-		e.removed = dup_bytes(t->text + pos, del);
+		e.removed = dup_range(t, pos, del);
 		e.added = dup_bytes(ins, n);
 		if (!e.removed || !e.added || !undo_room(t) ||
 		    !splice(t, pos, del, ins, n)) {
@@ -330,6 +482,9 @@ static bool apply(ctui_textarea *t, size_t pos, size_t del, const char *ins,
 bool ctui_textarea_replace(ctui_textarea *t, size_t pos, size_t del,
 			   const char *ins, size_t n)
 {
+	if (pos > t->len || del > t->len - pos ||
+	    n > (size_t)-1 - 1 - (t->len - del))
+		return false;
 	size_t c = t->cursor;
 	if (c >= pos + del)
 		c = c - del + n;
@@ -350,6 +505,8 @@ bool ctui_textarea_delete(ctui_textarea *t, size_t pos, size_t n)
 
 bool ctui_textarea_set_text(ctui_textarea *t, const char *text)
 {
+	if (t->source.read && (!t->source.replace || t->read_only))
+		return false;
 	text = text ? text : "";
 	size_t n = strlen(text);
 	if (t->max_bytes && n > t->max_bytes)
@@ -437,7 +594,7 @@ bool ctui_textarea_copy(ctui_textarea *t)
 	size_t a, b;
 	if (!ctui_textarea_range(t, &a, &b))
 		return false;
-	char *copy = dup_bytes(t->text + a, b - a);
+	char *copy = dup_range(t, a, b - a);
 	if (!copy)
 		return false;
 	free(t->clip);
@@ -526,15 +683,14 @@ static void move_to(ctui_textarea *t, size_t target, bool extend,
 
 static size_t vertical_target(const ctui_textarea *t, long delta)
 {
-	size_t line, byte, len;
+	size_t line, byte;
 	ctui_textarea_locate(t, t->cursor, &line, &byte);
 	long to = (long)line + delta;
 	if (to < 0)
 		to = 0;
 	if (to >= (long)t->line_count)
 		to = (long)t->line_count - 1;
-	const char *s = ctui_textarea_line(t, (size_t)to, &len);
-	return t->starts[to] + ctui_line_byte(s, len, t->goal);
+	return line_start(t, (size_t)to) + line_byte(t, (size_t)to, t->goal);
 }
 
 static bool navigate(ctui_textarea *t, int key, size_t rows)
@@ -578,7 +734,7 @@ static bool navigate(ctui_textarea *t, int key, size_t rows)
 	}
 	size_t cursor = t->cursor, anchor = t->anchor, a = 0, b = 0;
 	bool had = ctui_textarea_range(t, &a, &b), keep_goal = false;
-	size_t target, line, byte, len;
+	size_t target, line, byte, len, start;
 	ctui_textarea_locate(t, t->cursor, &line, &byte);
 	long page = (long)(rows ? rows : 1);
 	switch (key) {
@@ -605,11 +761,11 @@ static bool navigate(ctui_textarea *t, int key, size_t rows)
 		keep_goal = true;
 		break;
 	case KEY_HOME:
-		target = t->starts[line];
+		target = line_start(t, line);
 		break;
 	case KEY_END:
-		ctui_textarea_line(t, line, &len);
-		target = t->starts[line] + len;
+		ctui_textarea_line_bounds(t, line, &start, &len);
+		target = start + len;
 		break;
 	default:
 		return false;
@@ -686,9 +842,7 @@ static size_t nearest(const ctui_textarea *t, int height, int y, int x)
 	size_t col = x < gutter ? 0 : t->left + (size_t)(x - gutter);
 	if (x < 0)
 		col = t->left ? t->left - 1 : 0;
-	size_t len;
-	const char *s = ctui_textarea_line(t, (size_t)row, &len);
-	return t->starts[row] + ctui_line_byte(s, len, col);
+	return line_start(t, (size_t)row) + line_byte(t, (size_t)row, col);
 }
 
 bool ctui_textarea_hit(const ctui_textarea *t, int width, int height, int y,
@@ -758,14 +912,13 @@ void ctui_textarea_reveal(ctui_textarea *t, size_t rows, size_t cols)
 	size_t max_top = t->line_count > rows ? t->line_count - rows : 0;
 	if (t->top > max_top)
 		t->top = max_top;
-	size_t line, byte, len;
+	size_t line, byte;
 	ctui_textarea_locate(t, t->cursor, &line, &byte);
 	if (line < t->top)
 		t->top = line;
 	if (line >= t->top + rows)
 		t->top = line - rows + 1;
-	const char *s = ctui_textarea_line(t, line, &len);
-	size_t col = ctui_line_column(s, len, byte);
+	size_t col = line_column(t, line, byte);
 	if (col < t->left)
 		t->left = col;
 	if (col >= t->left + cols)
@@ -778,7 +931,7 @@ void ctui_textarea_scroll_to(ctui_textarea *t, size_t rows, size_t top)
 		rows = 1;
 	size_t max = t->line_count > rows ? t->line_count - rows : 0;
 	t->top = top > max ? max : top;
-	size_t line, byte, len;
+	size_t line, byte;
 	ctui_textarea_locate(t, t->cursor, &line, &byte);
 	if (line < t->top)
 		line = t->top;
@@ -786,16 +939,15 @@ void ctui_textarea_scroll_to(ctui_textarea *t, size_t rows, size_t top)
 		line = t->top + rows - 1;
 	else
 		return;
-	const char *s = ctui_textarea_line(t, line, &len);
-	t->cursor = t->starts[line] + ctui_line_byte(s, len, t->goal);
+	t->cursor = line_start(t, line) + line_byte(t, line, t->goal);
 }
 
 static void draw_line(const ctui_textarea *t, size_t index, int y, int x,
 		      int width, bool focused)
 {
-	size_t len;
-	const char *line = ctui_textarea_line(t, index, &len);
-	size_t base = t->starts[index], a = 0, b = 0;
+	size_t base, len, a = 0, b = 0;
+	ctui_textarea_line_bounds(t, index, &base, &len);
+	text_reader reader = {.area = t};
 	bool has = ctui_textarea_range(t, &a, &b);
 	int body = ctui_attr(CTUI_PAIR_BODY, false),
 	    sel = ctui_attr(CTUI_PAIR_SELECTION, false);
@@ -803,9 +955,11 @@ static void draw_line(const ctui_textarea *t, size_t index, int y, int x,
 	int used = 0;
 	while (i < len && used < width) {
 		unsigned long cp;
-		size_t n = ctui_utf8_decode(line + i, &cp);
-		if (i + n > len)
-			n = len - i;
+		size_t n = reader_decode(&reader, base + i, base + len, &cp);
+		if (!n || n > 4)
+			break;
+		if (n > len - i)
+			break;
 		size_t cells = ctui_cell_width(cp, col);
 		size_t off = base + i;
 		int attr = has && off >= a && off < b ? sel : body;
@@ -822,7 +976,9 @@ static void draw_line(const ctui_textarea *t, size_t index, int y, int x,
 				ctui_put(y, x + used, 1, "?", attr);
 			} else {
 				char glyph[8];
-				memcpy(glyph, line + i, n);
+				memcpy(glyph,
+				       reader_at(&reader, base + i, base + len),
+				       n);
 				glyph[n] = '\0';
 				ctui_put(y, x + used, (int)cells, glyph, attr);
 			}

@@ -46,6 +46,29 @@
 
 #define CTUI_TEXTAREA_HISTORY 256 /* edit records kept for undo */
 
+/* External storage. The descriptor is copied; ctx remains caller-owned and
+ * must outlive the area. Metadata describes the current text, with at least
+ * one line (including the empty last line after a trailing newline).
+ * line_start(0) is 0; subsequent starts follow a newline, in increasing order.
+ * read must copy exactly n bytes or return false. Requests are at most
+ * CTUI_TEXTAREA_CHUNK bytes and can cross storage fragments and UTF-8
+ * sequences. replace is optional (NULL = no editing), must be atomic on
+ * failure, and must update all metadata before returning true. Do not mutate
+ * the source outside textarea operations while attached. Callbacks must not
+ * re-enter the same textarea. No callback or ctx is freed by
+ * ctui_textarea_free(). */
+#define CTUI_TEXTAREA_CHUNK 4096
+
+typedef struct ctui_textarea_source {
+	void *ctx;
+	size_t (*length)(void *ctx);
+	size_t (*lines)(void *ctx);
+	size_t (*line_start)(void *ctx, size_t line);
+	bool (*read)(void *ctx, size_t offset, char *out, size_t n);
+	bool (*replace)(void *ctx, size_t pos, size_t del, const char *ins,
+			size_t n);
+} ctui_textarea_source;
+
 /* One undoable change: removed_len bytes at pos became added_len bytes. */
 typedef struct ctui_textarea_edit {
 	size_t pos;
@@ -55,7 +78,8 @@ typedef struct ctui_textarea_edit {
 } ctui_textarea_edit;
 
 typedef struct ctui_textarea {
-	char *text;	   /* NUL-terminated, owned */
+	ctui_textarea_source source; /* external when source.read != NULL */
+	char *text;		     /* NUL-terminated, owned */
 	size_t len, cap;   /* bytes of text without the NUL; allocated bytes */
 	size_t *starts;	   /* byte offset of each line */
 	size_t line_count; /* at least 1 */
@@ -84,9 +108,29 @@ typedef struct ctui_textarea {
 
 /* Start with a copy of initial (NULL = empty). False when out of memory. */
 bool ctui_textarea_init(ctui_textarea *t, const char *initial);
+/* Start without copying text or building a line index. Invalid callbacks or
+ * metadata leave an empty, freeable area and return false. Like init, call
+ * only on a new/freed area. Cursor, keys, drawing, selection, clipboard and
+ * undo/redo use the source; no complete line is materialised, even for long
+ * lines. The source supplies an index; this API does not implement file I/O.
+ * History and clipboard still allocate the bytes explicitly edited/copied. */
+bool ctui_textarea_init_source(ctui_textarea *t,
+			       const ctui_textarea_source *source);
 void ctui_textarea_free(ctui_textarea *t);
 
-/* The text, NUL-terminated; valid until the next edit. */
+/* Copy a byte range to caller storage, without a terminator. False for an
+ * invalid range, NULL output for nonzero n, or a failed source read. On
+ * failure out may contain a partial result. Zero bytes at len is valid. */
+bool ctui_textarea_read(const ctui_textarea *t, size_t offset, char *out,
+			size_t n);
+
+/* Start and length of line i, excluding its newline; i is clamped. Does not
+ * read text or allocate. Valid for both owned and external storage. */
+void ctui_textarea_line_bounds(const ctui_textarea *t, size_t i, size_t *start,
+			       size_t *len);
+
+/* The owned text, NUL-terminated; valid until the next edit. NULL for an
+ * external source: use ctui_textarea_read() to avoid materialising it. */
 const char *ctui_textarea_text(const ctui_textarea *t);
 size_t ctui_textarea_length(const ctui_textarea *t);
 
@@ -95,7 +139,9 @@ size_t ctui_textarea_length(const ctui_textarea *t);
  * max_bytes or memory runs out. */
 bool ctui_textarea_set_text(ctui_textarea *t, const char *text);
 
-/* Line i without its newline; *len receives its length in bytes. */
+/* Owned line i without its newline; *len receives its length in bytes.
+ * With external storage returns NULL but still sets *len. Use line_bounds
+ * and read instead. No implicit whole-line or whole-document allocation. */
 const char *ctui_textarea_line(const ctui_textarea *t, size_t i, size_t *len);
 
 /* Line and byte within the line of a byte offset, and back (the byte is
