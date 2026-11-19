@@ -3,6 +3,12 @@
 All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0] - 2026-11-19
+
+### Added
+
+- **textarea**: edit text through an external fragment source (`2535f36`)
+
 ## [0.1.0] - 2026-11-08
 
 ### Added

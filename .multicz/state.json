@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "git_head": "744a635b014c15ed1ca7e150ac96dd78e063ce1a",
-  "git_head_short": "744a635",
-  "timestamp": "2026-11-08T12:40:12Z",
+  "git_head": "ea866679b1584a567940d403e5e3343202f8f3dc",
+  "git_head_short": "ea86667",
+  "timestamp": "2026-11-19T16:09:01Z",
   "components": {
     "ctui": {
-      "version": "0.1.0",
-      "tag": "v0.1.0",
+      "version": "0.2.0",
+      "tag": "v0.2.0",
       "tag_sha": null
     }
   }
