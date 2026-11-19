@@ -210,7 +210,9 @@ are ignored, and `ctui_labels_load()` reads a single file.
   clipboard (cut, copy, paste), bounded undo and redo that coalesces typing,
   a modified flag, an optional size limit, a read-only mode, an optional
   line-number gutter, and mouse click and drag; the editing operations work
-  on byte offsets without a screen.
+  on byte offsets without a screen. An optional caller-owned source supplies
+  text in bounded fragments without copying the document or its line index;
+  see [external textarea storage](docs/textarea-source.md).
 - **richtext**: styled text made of spans (a UTF-8 slice with a theme colour,
   bold / dim / italic / underline / reverse and a link id), lines of spans and
   documents of lines, all in caller-owned arrays. `ctui_rt_parse()` reads a small
